@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
 
@@ -8,6 +9,7 @@ from app.config import Settings
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.db
 def test_migrations_upgrade_downgrade_and_upgrade_again(settings: Settings) -> None:
     config = Config(str(BACKEND_DIR / "alembic.ini"))
     config.attributes["database_url"] = settings.database_url

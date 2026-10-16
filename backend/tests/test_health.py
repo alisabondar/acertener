@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
@@ -11,6 +12,7 @@ def test_health_is_ok(client: TestClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
+@pytest.mark.db
 def test_health_ready_checks_the_database(client: TestClient) -> None:
     response = client.get("/health/ready")
 
@@ -33,6 +35,7 @@ def test_health_ready_is_503_without_leaking_connection_details() -> None:
     assert "canary" not in response.text
 
 
+@pytest.mark.db
 def test_health_ready_is_503_when_the_database_rejects_the_connection(
     settings: Settings,
 ) -> None:
