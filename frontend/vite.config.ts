@@ -3,9 +3,6 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 
 // https://vite.dev/config/
 export default defineConfig({
-  staged: {
-    "*": "vp check --fix",
-  },
   fmt: {},
   lint: {
     plugins: ["react", "typescript", "oxc"],

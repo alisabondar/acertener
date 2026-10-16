@@ -1,0 +1,22 @@
+# Install once: pre-commit install
+repos:
+  - repo: local
+    hooks:
+      # Uses the installed gitleaks binary (brew install gitleaks); CI pins its own.
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: gitleaks git --pre-commit --staged --redact --verbose
+        language: system
+        pass_filenames: false
+      - id: backend-check
+        name: backend ruff lint, ruff format, mypy
+        entry: bash -c 'cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+      - id: frontend-check
+        name: frontend vp check (lint, format, types)
+        entry: bash -c 'cd frontend && vp check'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
