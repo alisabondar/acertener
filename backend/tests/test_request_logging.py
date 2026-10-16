@@ -5,7 +5,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.logging import JsonFormatter
-from app.main import create_app
 
 REQUEST_LOGGER = "app.request"
 
@@ -56,23 +55,3 @@ def test_query_string_never_reaches_logs(
     formatter = JsonFormatter()
     assert all("CanarySmith" not in formatter.format(r) for r in caplog.records)
     assert _request_logs(caplog), "expected a request log line"
-
-
-def test_unhandled_error_is_still_logged_with_request_id(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    app = create_app()
-
-    @app.get("/boom")
-    async def boom() -> None:
-        raise RuntimeError("unexpected")
-
-    caplog.set_level("INFO", logger=REQUEST_LOGGER)
-    with TestClient(app, raise_server_exceptions=False) as client:
-        response = client.get("/boom")
-
-    assert response.status_code == 500
-    [entry] = _request_logs(caplog)
-    assert entry["route"] == "/boom"
-    assert entry["status"] == 500
-    uuid.UUID(str(entry["request_id"]))

@@ -1,5 +1,3 @@
-"""Structured JSON logging. Log lines carry IDs only, never PHI"""
-
 import json
 import logging
 from contextvars import ContextVar

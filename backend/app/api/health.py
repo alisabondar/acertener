@@ -11,5 +11,5 @@ async def health() -> dict[str, str]:
 
 @router.get("/health/ready")
 async def ready() -> dict[str, str]:
-    """Readiness: dependencies are reachable. The DB check lands in T-0.4."""
+    """Readiness: dependencies are reachable."""
     return {"status": "ready"}

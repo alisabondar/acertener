@@ -24,11 +24,7 @@ def _incoming_request_id(headers: Headers) -> str | None:
 
 
 class RequestContextMiddleware:
-    """Assigns a request ID, echoes it in `X-Request-ID`, and logs one line per request.
-
-    Pure ASGI (not BaseHTTPMiddleware) so contextvars reach background tasks and
-    streamed responses aren't buffered.
-    """
+    """Assigns a request ID, echoes it in `X-Request-ID`, and logs one line per request."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
