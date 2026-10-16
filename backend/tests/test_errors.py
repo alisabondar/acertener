@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
+from app.config import Settings
 from app.errors import AppError, ConflictError, NotFoundError
 from app.logging import JsonFormatter
 from app.main import create_app
@@ -24,8 +25,8 @@ class PatientIn(BaseModel):
     address: Address
 
 
-def _app_with_test_routes() -> FastAPI:
-    app = create_app()
+def _app_with_test_routes(settings: Settings) -> FastAPI:
+    app = create_app(settings)
 
     @app.get("/raise/{kind}")
     async def raise_error(kind: str) -> None:
@@ -51,8 +52,8 @@ def _app_with_test_routes() -> FastAPI:
 
 
 @pytest.fixture
-def error_client() -> TestClient:
-    return TestClient(_app_with_test_routes(), raise_server_exceptions=False)
+def error_client(settings: Settings) -> TestClient:
+    return TestClient(_app_with_test_routes(settings), raise_server_exceptions=False)
 
 
 def _assert_problem(response_json: dict[str, object], status: int, code: str) -> None:

@@ -16,6 +16,7 @@ class ErrorCode(Enum):
     METHOD_NOT_ALLOWED = (HTTPStatus.METHOD_NOT_ALLOWED, "This method is not allowed here.")
     CONFLICT = (HTTPStatus.CONFLICT, "The resource has changed.")
     INTERNAL_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "Something went wrong on our side.")
+    SERVICE_UNAVAILABLE = (HTTPStatus.SERVICE_UNAVAILABLE, "A dependency is unavailable.")
 
     def __init__(self, status: HTTPStatus, detail: str) -> None:
         self.status = status
@@ -46,3 +47,7 @@ class ConflictError(AppError):
 
 class BusinessRuleError(AppError):
     code = ErrorCode.BUSINESS_RULE_VIOLATION
+
+
+class ServiceUnavailableError(AppError):
+    code = ErrorCode.SERVICE_UNAVAILABLE
