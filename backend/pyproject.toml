@@ -48,3 +48,13 @@ plugins = ["pydantic.mypy"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra --strict-markers"
+markers = ["db: needs the real test Postgres (deselect with -m 'not db')"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
