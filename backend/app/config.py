@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=REPO_ROOT / ".env", extra="ignore")
 
     database_url: str
+    keys_dir: Path = REPO_ROOT / ".keys"
 
 
 @lru_cache

@@ -5,7 +5,9 @@ from fastapi import FastAPI
 
 from app.api import health, v1
 from app.config import Settings, get_settings
+from app.crypto import FernetFieldCipher, load_or_create_keys
 from app.db import create_engine
+from app.db.types import set_field_cipher
 from app.error_handlers import register_error_handlers
 from app.logging import configure_logging
 from app.middleware import RequestContextMiddleware
@@ -18,6 +20,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        keys = load_or_create_keys(settings.keys_dir)
+        set_field_cipher(FernetFieldCipher(keys.field_keys, keys.fingerprint_key))
         app.state.engine = create_engine(settings.database_url)
         yield
         await app.state.engine.dispose()
