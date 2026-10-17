@@ -190,3 +190,17 @@ class PatientChanges(BaseModel):
 class PatientUpdate(BaseModel):
     base_version: int
     changes: PatientChanges
+
+
+class StatusChange(BaseModel):
+    base_version: int
+    status: PatientStatus
+
+
+class ArchiveRequest(BaseModel):
+    base_version: int
+    reason: Literal["entered_in_error", "duplicate", "other"]
+
+
+class RestoreRequest(BaseModel):
+    base_version: int

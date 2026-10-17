@@ -3,6 +3,7 @@
 import uuid
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +12,12 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.audit import Audit, AuditAction, AuditEntry
 from app.crypto import FieldCipher
 from app.db.models import CareTeamMember, Patient, User
-from app.errors import DuplicateMrnConflictError, PatientNotFoundError, PossibleDuplicateError
+from app.errors import (
+    DuplicateMrnConflictError,
+    InvalidStateError,
+    PatientNotFoundError,
+    PossibleDuplicateError,
+)
 from app.patients.repository import DuplicateMrnError, NewPatient, PatientRepository
 
 # Who joins a new patient's care team when they register them.
@@ -72,14 +78,46 @@ class PatientService:
     async def update(
         self, patient_id: uuid.UUID, base_version: int, changes: Mapping[str, Any]
     ) -> Patient:
+        patient = await self._load(patient_id, base_version)
+        return await self._apply(patient, changes, AuditAction.UPDATE)
+
+    async def set_status(self, patient_id: uuid.UUID, base_version: int, status: str) -> Patient:
+        patient = await self._load(patient_id, base_version)
+        return await self._apply(patient, {"status": status}, AuditAction.STATUS_CHANGE)
+
+    async def archive(self, patient_id: uuid.UUID, base_version: int, reason: str) -> Patient:
+        patient = await self._load(patient_id, base_version)
+        if patient.archived_at is not None:
+            raise InvalidStateError("This patient is already archived.")
+        values = {
+            "archived_at": datetime.now(UTC),
+            "archived_by": self._user.id,
+            "archive_reason": reason,
+        }
+        return await self._apply(patient, values, AuditAction.ARCHIVE)
+
+    async def restore(self, patient_id: uuid.UUID, base_version: int) -> Patient:
+        patient = await self._load(patient_id, base_version)
+        if patient.archived_at is None:
+            raise InvalidStateError("This patient isn't archived.")
+        values = {"archived_at": None, "archived_by": None, "archive_reason": None}
+        return await self._apply(patient, values, AuditAction.RESTORE)
+
+    async def _load(self, patient_id: uuid.UUID, base_version: int) -> Patient:
         patient = await self._repo.get(patient_id)
         if patient is None:
             raise PatientNotFoundError
         if patient.version != base_version:
             raise StaleVersion(patient)
+        return patient
+
+    async def _apply(
+        self, patient: Patient, values: Mapping[str, Any], action: AuditAction
+    ) -> Patient:
+        """Apply only the values that differ, audited with old -> new, in one savepoint."""
         diff = {
             name: (getattr(patient, name), value)
-            for name, value in changes.items()
+            for name, value in values.items()
             if getattr(patient, name) != value
         }
         if not diff:
@@ -88,16 +126,16 @@ class PatientService:
         try:
             async with self._transaction():
                 try:
-                    await self._repo.update(patient_id, **new_values)
+                    await self._repo.update(patient.id, **new_values)
                 except DuplicateMrnError:
                     raise DuplicateMrnConflictError from None
                 await self._audit.record_change(
-                    AuditEntry(AuditAction.UPDATE, "patient", patient.id, patient.id, diff)
+                    AuditEntry(action, "patient", patient.id, patient.id, diff)
                 )
         except StaleDataError:
-            # Another save landed between our read and write. The transaction has been
+            # Another save landed between our read and write. The savepoint has been
             # rolled back by now, so the current record can be reloaded for the 409.
-            raise StaleVersion(await self._reload(patient_id)) from None
+            raise StaleVersion(await self._reload(patient.id)) from None
         return patient
 
     async def _reload(self, patient_id: uuid.UUID) -> Patient:

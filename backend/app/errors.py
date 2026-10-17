@@ -24,6 +24,10 @@ class ErrorCode(Enum):
     )
     DUPLICATE_MRN = (HTTPStatus.CONFLICT, "Another patient already has this MRN.")
     VERSION_CONFLICT = (HTTPStatus.CONFLICT, "Someone else changed this record first.")
+    INVALID_STATE = (
+        HTTPStatus.CONFLICT,
+        "That action doesn't apply to the record's current state.",
+    )
     INTERNAL_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "Something went wrong on our side.")
     SERVICE_UNAVAILABLE = (HTTPStatus.SERVICE_UNAVAILABLE, "A dependency is unavailable.")
 
@@ -85,3 +89,7 @@ class DuplicateMrnConflictError(AppError):
 
 class VersionConflictError(AppError):
     code = ErrorCode.VERSION_CONFLICT
+
+
+class InvalidStateError(AppError):
+    code = ErrorCode.INVALID_STATE

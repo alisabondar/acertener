@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Awaitable
 from datetime import UTC, date, datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -27,6 +28,7 @@ from app.patients.service import PatientService, StaleVersion
 from app.schemas.patients import (
     AccessLogItem,
     AccessLogPage,
+    ArchiveRequest,
     FilterCountsOut,
     Order,
     PatientCreate,
@@ -36,9 +38,11 @@ from app.schemas.patients import (
     PatientStatus,
     PatientUpdate,
     QuickFilter,
+    RestoreRequest,
     Scope,
     SearchTerms,
     Sort,
+    StatusChange,
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -211,13 +215,74 @@ async def update(
 ) -> PatientDetail:
     """Applies only the fields sent. A stale base_version returns 409 with the current record."""
     service = PatientService(session, get_field_cipher(), user, audit)
+    patient = await _saved(
+        request,
+        session,
+        user,
+        service.update(patient_id, body.base_version, body.changes.model_dump(exclude_unset=True)),
+    )
+    return await _detail_out(request, session, user, patient)
+
+
+async def _saved(
+    request: Request, session: AsyncSession, user: User, write: Awaitable[Patient]
+) -> Patient:
+    """Await a versioned write; a stale base_version becomes a 409 with the current record."""
     try:
-        patient = await service.update(
-            patient_id, body.base_version, body.changes.model_dump(exclude_unset=True)
-        )
+        return await write
     except StaleVersion as stale:
         current = await _detail_out(request, session, user, stale.current)
         raise VersionConflictError(current=current.model_dump(mode="json")) from None
+
+
+StatusChanger = Annotated[User, Depends(require(Permission.CHANGE_PATIENT_STATUS))]
+Archiver = Annotated[User, Depends(require(Permission.ARCHIVE_PATIENT))]
+
+
+@router.post("/{patient_id:uuid}/status")
+async def change_status(
+    request: Request,
+    patient_id: uuid.UUID,
+    body: StatusChange,
+    user: StatusChanger,
+    session: Session,
+    audit: AuditDep,
+) -> PatientDetail:
+    service = PatientService(session, get_field_cipher(), user, audit)
+    patient = await _saved(
+        request, session, user, service.set_status(patient_id, body.base_version, body.status)
+    )
+    return await _detail_out(request, session, user, patient)
+
+
+@router.post("/{patient_id:uuid}/archive")
+async def archive(
+    request: Request,
+    patient_id: uuid.UUID,
+    body: ArchiveRequest,
+    user: Archiver,
+    session: Session,
+    audit: AuditDep,
+) -> PatientDetail:
+    """Hides the record from lists and search; it stays viewable by id. Nothing is deleted."""
+    service = PatientService(session, get_field_cipher(), user, audit)
+    patient = await _saved(
+        request, session, user, service.archive(patient_id, body.base_version, body.reason)
+    )
+    return await _detail_out(request, session, user, patient)
+
+
+@router.post("/{patient_id:uuid}/restore")
+async def restore(
+    request: Request,
+    patient_id: uuid.UUID,
+    body: RestoreRequest,
+    user: Archiver,
+    session: Session,
+    audit: AuditDep,
+) -> PatientDetail:
+    service = PatientService(session, get_field_cipher(), user, audit)
+    patient = await _saved(request, session, user, service.restore(patient_id, body.base_version))
     return await _detail_out(request, session, user, patient)
 
 
