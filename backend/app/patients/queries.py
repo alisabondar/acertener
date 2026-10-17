@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, Select, exists, func, select
+from sqlalchemy import ColumnElement, Select, and_, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto import FieldCipher
@@ -99,3 +99,27 @@ async def list_patients(
         query.offset((params.page - 1) * params.page_size).limit(params.page_size)
     )
     return [ListedPatient(p, on) for p, on in rows], total or 0
+
+
+@dataclass(frozen=True)
+class FilterCounts:
+    today_visits: int
+    status: dict[str, int]
+    archived: int
+
+
+async def count_filters(
+    session: AsyncSession, user: User, scope: Scope, today: date, tz: ZoneInfo
+) -> FilterCounts:
+    """Every quick-filter count in one query, using the same conditions as the list."""
+    current = Patient.archived_at.is_(None)
+    statuses = ("active", "inactive", "deceased")
+    query = select(
+        func.count().filter(and_(current, _visit_on(today, tz))),
+        *(func.count().filter(and_(current, Patient.status == s)) for s in statuses),
+        func.count().filter(Patient.archived_at.is_not(None)),
+    ).select_from(Patient)
+    if scope is Scope.MY:
+        query = query.where(on_care_team(user))
+    today_visits, *by_status, archived = (await session.execute(query)).one()
+    return FilterCounts(today_visits, dict(zip(statuses, by_status, strict=True)), archived)

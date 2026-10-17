@@ -128,6 +128,17 @@ class PatientRepository:
         query = query.order_by(Patient.last_visit_at.desc().nulls_last(), Patient.id).limit(limit)
         return list(await self._session.scalars(query))
 
+    async def find_likely_duplicates(self, last_name: str, dob: date) -> list[uuid.UUID]:
+        """Current patients with the same last name and DOB (a warning, not proof)."""
+        rows = await self._session.scalars(
+            select(Patient.id).where(
+                Patient.last_name_fp == self._cipher.fingerprint(Purpose.LAST_NAME, last_name),
+                Patient.dob_fp == self._fingerprint_dob(dob),
+                Patient.archived_at.is_(None),
+            )
+        )
+        return list(rows)
+
     def search_conditions(
         self,
         last_name: str | None,

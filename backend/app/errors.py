@@ -18,6 +18,12 @@ class ErrorCode(Enum):
     PATIENT_NOT_FOUND = (HTTPStatus.NOT_FOUND, "Patient not found.")
     METHOD_NOT_ALLOWED = (HTTPStatus.METHOD_NOT_ALLOWED, "This method is not allowed here.")
     CONFLICT = (HTTPStatus.CONFLICT, "The resource has changed.")
+    POSSIBLE_DUPLICATE = (
+        HTTPStatus.CONFLICT,
+        "A patient with this last name and date of birth may already exist.",
+    )
+    DUPLICATE_MRN = (HTTPStatus.CONFLICT, "Another patient already has this MRN.")
+    VERSION_CONFLICT = (HTTPStatus.CONFLICT, "Someone else changed this record first.")
     INTERNAL_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "Something went wrong on our side.")
     SERVICE_UNAVAILABLE = (HTTPStatus.SERVICE_UNAVAILABLE, "A dependency is unavailable.")
 
@@ -32,8 +38,10 @@ class AppError(Exception):
     code: ErrorCode = ErrorCode.INTERNAL_ERROR
     headers: ClassVar[dict[str, str]] = {}
 
-    def __init__(self, detail: str | None = None) -> None:
+    def __init__(self, detail: str | None = None, **extensions: object) -> None:
         self.detail = detail or self.code.detail
+        # Extra Problem Details members (RFC 9457 allows them). Never PHI.
+        self.extensions = extensions
         super().__init__(self.code.name)
 
 
@@ -65,3 +73,15 @@ class NotAuthenticatedError(AppError):
 
 class PatientNotFoundError(AppError):
     code = ErrorCode.PATIENT_NOT_FOUND
+
+
+class PossibleDuplicateError(AppError):
+    code = ErrorCode.POSSIBLE_DUPLICATE
+
+
+class DuplicateMrnConflictError(AppError):
+    code = ErrorCode.DUPLICATE_MRN
+
+
+class VersionConflictError(AppError):
+    code = ErrorCode.VERSION_CONFLICT

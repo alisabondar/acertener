@@ -97,6 +97,7 @@ async def api(app: FastAPI, db_session: AsyncSession) -> AsyncIterator[httpx2.As
         expire_on_commit=False,
         join_transaction_mode="create_savepoint",
     )
-    transport = httpx2.ASGITransport(app=app)
+    # Like a real client: unhandled errors arrive as 500 responses, not raised exceptions.
+    transport = httpx2.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client

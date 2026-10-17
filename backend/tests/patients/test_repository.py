@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto import FieldCipher
@@ -131,3 +132,12 @@ async def test_search_is_capped(repo: PatientRepository) -> None:
         await repo.create(new_patient(mrn=f"MRN-{i}"))
 
     assert len(await repo.search(last_name="Smith", limit=2)) == 2
+
+
+async def test_other_database_errors_are_not_mistaken_for_duplicate_mrns(
+    repo: PatientRepository,
+) -> None:
+    patient = await repo.create(new_patient())
+
+    with pytest.raises(IntegrityError):
+        await repo.update(patient.id, status="asleep")

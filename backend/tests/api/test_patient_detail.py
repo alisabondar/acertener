@@ -132,3 +132,14 @@ async def test_front_desk_cannot_see_access_history(
     )
 
     assert response.status_code == 403
+
+
+async def test_only_uuids_route_to_a_patient(
+    api: httpx2.AsyncClient, db_session: AsyncSession
+) -> None:
+    viewer = await add_user(db_session)
+
+    response = await api.get("/api/v1/patients/not-a-uuid", headers=persona_headers(viewer))
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"

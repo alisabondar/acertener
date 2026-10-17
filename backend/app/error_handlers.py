@@ -23,6 +23,7 @@ def problem(
     detail: str,
     errors: dict[str, str] | None = None,
     headers: Mapping[str, str] | None = None,
+    extensions: Mapping[str, object] | None = None,
 ) -> JSONResponse:
     request_id: str | None = getattr(request.state, "request_id", None)
     body: dict[str, Any] = {
@@ -35,6 +36,8 @@ def problem(
     }
     if errors is not None:
         body["errors"] = errors
+    if extensions:
+        body.update(extensions)
     headers = dict(headers or {})
     if request_id:
         headers[REQUEST_ID_HEADER] = request_id
@@ -51,7 +54,14 @@ def _field_key(loc: Sequence[str | int]) -> str:
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error(request: Request, exc: AppError) -> JSONResponse:
-        return problem(request, exc.code.status, exc.code.name, exc.detail, headers=exc.headers)
+        return problem(
+            request,
+            exc.code.status,
+            exc.code.name,
+            exc.detail,
+            headers=exc.headers,
+            extensions=exc.extensions,
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

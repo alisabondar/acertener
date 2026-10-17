@@ -1,8 +1,16 @@
 import uuid
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 
 class Scope(StrEnum):
@@ -104,3 +112,81 @@ class AccessLogItem(BaseModel):
 class AccessLogPage(BaseModel):
     items: list[AccessLogItem]
     next_before_id: int | None
+
+
+class FilterCountsOut(BaseModel):
+    today_visits: int
+    status: dict[PatientStatus, int]
+    archived: int
+
+
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+Optional = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+Gender = Literal["female", "male", "nonbinary", "other", "unknown"]
+
+
+def _check_dob(dob: date) -> date:
+    if dob > date.today():
+        raise ValueError("Date of birth can't be in the future")
+    if dob.year < 1900:
+        raise ValueError("Date of birth is before 1900")
+    return dob
+
+
+Dob = Annotated[date, AfterValidator(_check_dob)]
+
+
+class PatientFields(BaseModel):
+    """Editable demographics and contact details (shape rules only; state rules live in the
+    service)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    first_name: Name
+    last_name: Name
+    mrn: Name
+    dob: Dob
+    gender: Gender | None = None
+    phone: Optional | None = None
+    email: Optional | None = None
+    address_line1: Optional | None = None
+    address_line2: Optional | None = None
+    city: Optional | None = None
+    state: Optional | None = None
+    postal_code: Optional | None = None
+
+
+class PatientCreate(PatientFields):
+    confirm_not_duplicate: bool = False
+
+
+class PatientChanges(BaseModel):
+    """A partial update: only the fields that are sent are applied."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    first_name: Name | None = None
+    last_name: Name | None = None
+    mrn: Name | None = None
+    dob: Dob | None = None
+    gender: Gender | None = None
+    phone: Optional | None = None
+    email: Optional | None = None
+    address_line1: Optional | None = None
+    address_line2: Optional | None = None
+    city: Optional | None = None
+    state: Optional | None = None
+    postal_code: Optional | None = None
+
+    @field_validator("first_name", "last_name", "mrn", "dob", mode="before")
+    @classmethod
+    def _required_fields_stay_set(cls, value: object) -> object:
+        # Leaving a field out means "don't change it"; sending null would erase a required value.
+        if value is None:
+            raise ValueError("this field is required and can't be cleared")
+        return value
+
+
+class PatientUpdate(BaseModel):
+    base_version: int
+    changes: PatientChanges

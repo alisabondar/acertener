@@ -12,23 +12,29 @@ from app.auth.permissions import Permission, require
 from app.db.models import AuditLog, Patient, User
 from app.db.session import get_session
 from app.db.types import get_field_cipher
-from app.errors import PatientNotFoundError
+from app.errors import PatientNotFoundError, VersionConflictError
 from app.patients.derived import age_on, inactivity_suggested
 from app.patients.queries import (
     ListedPatient,
     ListParams,
+    count_filters,
     list_patients,
     on_care_team,
     practice_today,
 )
+from app.patients.repository import NewPatient
+from app.patients.service import PatientService, StaleVersion
 from app.schemas.patients import (
     AccessLogItem,
     AccessLogPage,
+    FilterCountsOut,
     Order,
+    PatientCreate,
     PatientDetail,
     PatientListItem,
     PatientPage,
     PatientStatus,
+    PatientUpdate,
     QuickFilter,
     Scope,
     SearchTerms,
@@ -118,6 +124,21 @@ async def search(
     return page
 
 
+@router.get("/filter-counts")
+async def filter_counts(
+    request: Request, user: Viewer, session: Session, audit: AuditDep, scope: Scope = Scope.MY
+) -> FilterCountsOut:
+    """Counts for the list's quick-filter chips."""
+    tz = ZoneInfo(request.app.state.settings.practice_timezone)
+    counts = await count_filters(session, user, scope, practice_today(datetime.now(UTC), tz), tz)
+    audit.record_read(AuditEntry(AuditAction.VIEW, "patient_counts"))
+    return FilterCountsOut(
+        today_visits=counts.today_visits,
+        status={PatientStatus(k): v for k, v in counts.status.items()},
+        archived=counts.archived,
+    )
+
+
 async def _get_patient(session: AsyncSession, patient_id: uuid.UUID) -> Patient:
     patient = await session.get(Patient, patient_id)
     if patient is None:
@@ -125,16 +146,12 @@ async def _get_patient(session: AsyncSession, patient_id: uuid.UUID) -> Patient:
     return patient
 
 
-@router.get("/{patient_id}")
-async def detail(
-    request: Request, patient_id: uuid.UUID, user: Viewer, session: Session, audit: AuditDep
+async def _detail_out(
+    request: Request, session: AsyncSession, user: User, patient: Patient
 ) -> PatientDetail:
-    patient = await _get_patient(session, patient_id)
     on_team = await session.scalar(select(on_care_team(user)).where(Patient.id == patient.id))
-    today = practice_today(
-        datetime.now(UTC), ZoneInfo(request.app.state.settings.practice_timezone)
-    )
-    audit.record_read(AuditEntry(AuditAction.VIEW, "patient", patient.id, patient.id))
+    settings = request.app.state.settings
+    today = practice_today(datetime.now(UTC), ZoneInfo(settings.practice_timezone))
     return PatientDetail(
         id=patient.id,
         first_name=patient.first_name,
@@ -155,14 +172,56 @@ async def detail(
         archived=patient.archived_at is not None,
         archive_reason=patient.archive_reason,
         on_my_care_team=bool(on_team),
-        inactivity_suggested=inactivity_suggested(
-            patient, today, request.app.state.settings.inactive_after_years
-        ),
+        inactivity_suggested=inactivity_suggested(patient, today, settings.inactive_after_years),
         version=patient.version,
     )
 
 
-@router.get("/{patient_id}/access-log")
+@router.get("/{patient_id:uuid}")
+async def detail(
+    request: Request, patient_id: uuid.UUID, user: Viewer, session: Session, audit: AuditDep
+) -> PatientDetail:
+    patient = await _get_patient(session, patient_id)
+    audit.record_read(AuditEntry(AuditAction.VIEW, "patient", patient.id, patient.id))
+    return await _detail_out(request, session, user, patient)
+
+
+@router.post("", status_code=201)
+async def create(
+    request: Request,
+    body: PatientCreate,
+    user: Annotated[User, Depends(require(Permission.CREATE_PATIENT))],
+    session: Session,
+    audit: AuditDep,
+) -> PatientDetail:
+    data = NewPatient(**body.model_dump(exclude={"confirm_not_duplicate"}))
+    service = PatientService(session, get_field_cipher(), user, audit)
+    patient = await service.create(data, confirm_not_duplicate=body.confirm_not_duplicate)
+    return await _detail_out(request, session, user, patient)
+
+
+@router.patch("/{patient_id:uuid}")
+async def update(
+    request: Request,
+    patient_id: uuid.UUID,
+    body: PatientUpdate,
+    user: Annotated[User, Depends(require(Permission.EDIT_DEMOGRAPHICS))],
+    session: Session,
+    audit: AuditDep,
+) -> PatientDetail:
+    """Applies only the fields sent. A stale base_version returns 409 with the current record."""
+    service = PatientService(session, get_field_cipher(), user, audit)
+    try:
+        patient = await service.update(
+            patient_id, body.base_version, body.changes.model_dump(exclude_unset=True)
+        )
+    except StaleVersion as stale:
+        current = await _detail_out(request, session, user, stale.current)
+        raise VersionConflictError(current=current.model_dump(mode="json")) from None
+    return await _detail_out(request, session, user, patient)
+
+
+@router.get("/{patient_id:uuid}/access-log")
 async def access_log(
     patient_id: uuid.UUID,
     _: Annotated[User, Depends(require(Permission.VIEW_PATIENT_ACCESS_LOG))],
