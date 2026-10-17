@@ -18,11 +18,14 @@ pre-commit install                   # once: secret scan + lint on every commit
 cd backend
 uv sync
 uv run alembic upgrade head
+uv run python -m scripts.seed       # 20 synthetic patients, personas, and a developer account
 uv run uvicorn --factory app.main:create_app --reload
 ```
 
 - API: http://localhost:8000 · Interactive docs: http://localhost:8000/docs
 - Health: `GET /health` (process is up) and `GET /health/ready` (database reachable, otherwise `503`)
+- Encryption keys are created in `.keys/` on first start. Patient identifiers and clinical free text
+  are encrypted in the database; only the app can read them.
 
 ## Commands
 
@@ -34,6 +37,8 @@ uv run uvicorn --factory app.main:create_app --reload
 | Backend tests with the coverage gate (80%) | `cd backend && uv run pytest --cov` |
 | Frontend lint, format, types, tests | `cd frontend && bun run check` |
 | New migration | `cd backend && uv run alembic revision -m "describe change"` |
+| Seed the dev database (`--count N`, `--reset` to start over) | `cd backend && uv run python -m scripts.seed` |
+| Prove encryption (app view vs raw rows vs `pg_dump`) | `cd backend && uv run python -m scripts.prove_encryption` |
 
 ## Configuration
 
@@ -41,6 +46,8 @@ All config comes from environment variables. See [`.env.example`](.env.example).
 
 | Variable | Purpose |
 |---|---|
+| `ENV` | `development` (default), `test`, or `production`. Seeding runs only in `development`. |
+| `KEYS_DIR` | Where encryption keys live (default `.keys/`). **Deleting them makes encrypted data unreadable**, so reset keys and the database together. |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Local Docker Postgres credentials (dev only) |
 | `POSTGRES_PORT` | Host port for Postgres. If you change it, update both URLs below. |
 | `DATABASE_URL` | API database (`postgresql+asyncpg://…`) |

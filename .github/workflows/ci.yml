@@ -67,6 +67,8 @@ jobs:
         run: uv run mypy
       - name: Test (with coverage gate)
         run: uv run pytest --cov
+      - name: Security modules need 100% branch coverage
+        run: uv run coverage report --include="app/crypto/*" --fail-under=100
 
   frontend:
     runs-on: ubuntu-latest

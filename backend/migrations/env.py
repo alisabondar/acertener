@@ -6,6 +6,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import get_settings
+from app.db.models import Base
 from app.logging import configure_logging
 
 config = context.config
@@ -17,7 +18,7 @@ if config.attributes.get("configure_logging", True):
 # Read from attributes, not alembic.ini: ConfigParser rejects the `%` in URL-encoded passwords.
 database_url: str = config.attributes.get("database_url") or get_settings().database_url
 
-target_metadata = None
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
