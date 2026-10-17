@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     env: Literal["development", "test", "production"] = "development"
     demo_mode: bool = False
+    inactive_after_years: int = 3
+    # "Today" (today's visits, ages, inactivity) means the practice's calendar day.
+    practice_timezone: str = "America/New_York"
     database_url: str
     keys_dir: Path = REPO_ROOT / ".keys"
 

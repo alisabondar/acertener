@@ -6,7 +6,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import ColumnElement, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -121,15 +121,30 @@ class PatientRepository:
 
         Terms shorter than PREFIX_MIN_LENGTH only match names that short (e.g. "Li").
         """
-        if last_name is None and dob is None:
-            raise ValueError("search needs last_name or dob")
-        query = select(Patient)
+        query = select(Patient).where(*self.search_conditions(last_name, first_name, dob))
+        if not include_archived:
+            query = query.where(Patient.archived_at.is_(None))
+        # Ciphertext can't be sorted by name, so the most recently seen come first.
+        query = query.order_by(Patient.last_visit_at.desc().nulls_last(), Patient.id).limit(limit)
+        return list(await self._session.scalars(query))
+
+    def search_conditions(
+        self,
+        last_name: str | None,
+        first_name: str | None,
+        dob: date | None,
+        mrn: str | None = None,
+    ) -> list[ColumnElement[bool]]:
+        """WHERE clauses for a name-prefix, DOB, and/or exact MRN search, via fingerprints."""
+        if last_name is None and dob is None and mrn is None:
+            raise ValueError("search needs last_name, dob, or mrn")
+        conditions: list[ColumnElement[bool]] = []
         for purpose, term in (
             (Purpose.LAST_NAME_PREFIX, last_name),
             (Purpose.FIRST_NAME_PREFIX, first_name),
         ):
             if term is not None:
-                query = query.where(
+                conditions.append(
                     Patient.id.in_(
                         select(PatientNamePrefix.patient_id).where(
                             PatientNamePrefix.purpose == purpose,
@@ -138,12 +153,10 @@ class PatientRepository:
                     )
                 )
         if dob is not None:
-            query = query.where(Patient.dob_fp == self._fingerprint_dob(dob))
-        if not include_archived:
-            query = query.where(Patient.archived_at.is_(None))
-        # Ciphertext can't be sorted by name, so the most recently seen come first.
-        query = query.order_by(Patient.last_visit_at.desc().nulls_last(), Patient.id).limit(limit)
-        return list(await self._session.scalars(query))
+            conditions.append(Patient.dob_fp == self._fingerprint_dob(dob))
+        if mrn is not None:
+            conditions.append(Patient.mrn_fp == self._cipher.fingerprint(Purpose.MRN, mrn))
+        return conditions
 
     def _derive_search_fields(
         self, patient: Patient, last_name: str | None, dob: date | None, mrn: str | None
