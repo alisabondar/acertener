@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit import Audit, AuditAction, AuditEntry, get_audit
 from app.auth.permissions import Permission, require
 from app.db.models import AuditLog, User
-from tests.factories import make_audit, make_user
+from tests.factories import add_user, make_audit, persona_headers
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
 
@@ -30,13 +30,6 @@ def routes(app: FastAPI) -> None:
         return "ok"
 
 
-async def _persona(session: AsyncSession, role: str) -> User:
-    user = make_user(role=role, credential=None)
-    session.add(user)
-    await session.flush()
-    return user
-
-
 async def _entries(session: AsyncSession) -> list[AuditLog]:
     return list(await session.scalars(select(AuditLog).order_by(AuditLog.id)))
 
@@ -44,9 +37,9 @@ async def _entries(session: AsyncSession) -> list[AuditLog]:
 async def test_reads_are_recorded_after_the_response(
     api: httpx2.AsyncClient, db_session: AsyncSession
 ) -> None:
-    nurse = await _persona(db_session, "nurse")
+    nurse = await add_user(db_session, "nurse")
 
-    response = await api.get("/test/chart", headers={"X-Persona": str(nurse.id)})
+    response = await api.get("/test/chart", headers=persona_headers(nurse))
 
     [entry] = await _entries(db_session)
     assert (entry.actor_id, entry.via_demo_persona) == (nurse.id, True)
@@ -55,9 +48,9 @@ async def test_reads_are_recorded_after_the_response(
 
 
 async def test_denied_access_is_recorded(api: httpx2.AsyncClient, db_session: AsyncSession) -> None:
-    front_desk = await _persona(db_session, "front_desk")
+    front_desk = await add_user(db_session, "front_desk")
 
-    response = await api.get("/test/clinical", headers={"X-Persona": str(front_desk.id)})
+    response = await api.get("/test/clinical", headers=persona_headers(front_desk))
 
     assert response.status_code == 403
     [entry] = await _entries(db_session)
@@ -69,7 +62,7 @@ async def test_denied_access_is_recorded(api: httpx2.AsyncClient, db_session: As
 
 
 async def test_changes_share_the_callers_transaction(db_session: AsyncSession) -> None:
-    provider = await _persona(db_session, "provider")
+    provider = await add_user(db_session, "provider")
     audit = await make_audit(db_session, provider)
 
     savepoint = await db_session.begin_nested()
@@ -85,7 +78,7 @@ async def test_changes_share_the_callers_transaction(db_session: AsyncSession) -
     "statement", ["UPDATE audit_log SET action = 'x'", "DELETE FROM audit_log"]
 )
 async def test_audit_log_is_append_only(db_session: AsyncSession, statement: str) -> None:
-    provider = await _persona(db_session, "provider")
+    provider = await add_user(db_session, "provider")
     audit = await make_audit(db_session, provider)
     await audit.record_change(AuditEntry(AuditAction.VIEW, "patient", PATIENT_ID, PATIENT_ID))
 

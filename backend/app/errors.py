@@ -15,6 +15,7 @@ class ErrorCode(Enum):
     NOT_AUTHENTICATED = (HTTPStatus.UNAUTHORIZED, "Pick a persona to continue (demo mode).")
     PERMISSION_DENIED = (HTTPStatus.FORBIDDEN, "You don't have permission to do this.")
     NOT_FOUND = (HTTPStatus.NOT_FOUND, "The resource was not found.")
+    PATIENT_NOT_FOUND = (HTTPStatus.NOT_FOUND, "Patient not found.")
     METHOD_NOT_ALLOWED = (HTTPStatus.METHOD_NOT_ALLOWED, "This method is not allowed here.")
     CONFLICT = (HTTPStatus.CONFLICT, "The resource has changed.")
     INTERNAL_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "Something went wrong on our side.")
@@ -60,3 +61,7 @@ class NotAuthenticatedError(AppError):
     code = ErrorCode.NOT_AUTHENTICATED
     # HTTP requires a 401 to name the scheme; ours is the demo persona header.
     headers: ClassVar[dict[str, str]] = {"WWW-Authenticate": 'Persona realm="demo"'}
+
+
+class PatientNotFoundError(AppError):
+    code = ErrorCode.PATIENT_NOT_FOUND

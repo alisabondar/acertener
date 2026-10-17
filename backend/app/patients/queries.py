@@ -31,7 +31,7 @@ class ListedPatient:
     on_my_care_team: bool
 
 
-def _on_care_team(user: User) -> ColumnElement[bool]:
+def on_care_team(user: User) -> ColumnElement[bool]:
     return exists().where(
         CareTeamMember.patient_id == Patient.id,
         CareTeamMember.user_id == user.id,
@@ -76,7 +76,7 @@ async def list_patients(
     tz: ZoneInfo,
     terms: SearchTerms | None = None,
 ) -> tuple[list[ListedPatient], int]:
-    on_team = _on_care_team(user)
+    on_team = on_care_team(user)
     conditions: list[ColumnElement[bool]] = []
     if params.scope is Scope.MY:
         conditions.append(on_team)

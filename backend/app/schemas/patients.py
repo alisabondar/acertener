@@ -64,3 +64,43 @@ class PatientPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class PatientDetail(BaseModel):
+    """Demographics and contact details. Clinical data comes from separate, gated endpoints."""
+
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    mrn: str
+    dob: date
+    age: int
+    gender: str | None
+    phone: str | None
+    email: str | None
+    address_line1: str | None
+    address_line2: str | None
+    city: str | None
+    state: str | None
+    postal_code: str | None
+    status: PatientStatus
+    last_visit_at: datetime | None
+    archived: bool
+    archive_reason: str | None
+    on_my_care_team: bool
+    inactivity_suggested: bool
+    version: int
+
+
+class AccessLogItem(BaseModel):
+    occurred_at: datetime
+    actor_name: str
+    actor_role: str
+    via_demo_persona: bool
+    action: str
+    changed_fields: list[str]
+
+
+class AccessLogPage(BaseModel):
+    items: list[AccessLogItem]
+    next_before_id: int | None

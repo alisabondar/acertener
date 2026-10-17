@@ -60,3 +60,14 @@ async def add_visit(
         Visit(patient_id=patient.id, provider_id=provider.id, scheduled_at=when, status=status)
     )
     await session.flush()
+
+
+async def add_user(session: AsyncSession, role: str = "provider", **overrides: Any) -> User:
+    user = make_user(role=role, **overrides)
+    session.add(user)
+    await session.flush()
+    return user
+
+
+def persona_headers(user: User) -> dict[str, str]:
+    return {"X-Persona": str(user.id)}

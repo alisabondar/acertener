@@ -9,7 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.crypto import FieldCipher
 from app.db.models import AuditLog, Patient, User
 from app.patients.repository import PatientRepository
-from tests.factories import add_to_care_team, add_visit, create_patient, make_user
+from tests.factories import (
+    add_to_care_team,
+    add_user,
+    add_visit,
+    create_patient,
+    persona_headers,
+)
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
 
@@ -18,15 +24,12 @@ NOW = datetime.now(UTC)
 
 @pytest.fixture
 async def me(db_session: AsyncSession) -> User:
-    user = make_user(role="provider", credential="MD")
-    db_session.add(user)
-    await db_session.flush()
-    return user
+    return await add_user(db_session, "provider")
 
 
 @pytest.fixture
 def headers(me: User) -> dict[str, str]:
-    return {"X-Persona": str(me.id)}
+    return persona_headers(me)
 
 
 async def _patient(
