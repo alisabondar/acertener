@@ -6,6 +6,7 @@ import httpx2
 import pytest
 from alembic import command
 from cryptography.fernet import Fernet
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -77,11 +78,13 @@ def demo_mode() -> bool:
 
 
 @pytest.fixture
-async def api(
-    settings: Settings, db_session: AsyncSession, demo_mode: bool
-) -> AsyncIterator[httpx2.AsyncClient]:
+def app(settings: Settings, demo_mode: bool) -> FastAPI:
+    return create_app(settings.model_copy(update={"demo_mode": demo_mode}))
+
+
+@pytest.fixture
+async def api(app: FastAPI, db_session: AsyncSession) -> AsyncIterator[httpx2.AsyncClient]:
     """The app called in-process, sharing the test's rolled-back database session."""
-    app = create_app(settings.model_copy(update={"demo_mode": demo_mode}))
 
     async def test_session() -> AsyncIterator[AsyncSession]:
         yield db_session

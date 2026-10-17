@@ -54,6 +54,8 @@ markers = ["db: needs the real test Postgres (deselect with -m 'not db')"]
 [tool.coverage.run]
 branch = true
 source = ["app"]
+# SQLAlchemy's async engine switches greenlets; without this, lines after an await are missed.
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 fail_under = 80

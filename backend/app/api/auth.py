@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.identity import CurrentUser, require_demo_mode
+from app.auth.permissions import Permission, permissions_for
 from app.db.models import User
 from app.db.session import get_session
 from app.demo.personas import PERSONAS
@@ -23,9 +24,13 @@ class UserOut(BaseModel):
     credential: str | None
 
 
+class MeOut(UserOut):
+    permissions: list[Permission]
+
+
 @router.get("/auth/me")
-async def me(user: CurrentUser) -> UserOut:
-    return UserOut.model_validate(user)
+async def me(user: CurrentUser) -> MeOut:
+    return MeOut(**UserOut.model_validate(user).model_dump(), permissions=permissions_for(user))
 
 
 @router.get("/personas")
