@@ -1,6 +1,9 @@
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
 
+from fastapi import Request
+
+from app.audit.log import AuditAction, AuditEntry, build_row, write_now
 from app.auth.identity import CurrentUser
 from app.db.models import User
 from app.errors import PermissionDeniedError
@@ -51,11 +54,18 @@ def permissions_for(user: User) -> list[Permission]:
     return sorted(p for p in Permission if has_permission(user, p))
 
 
-def require(permission: Permission) -> Callable[[User], Awaitable[User]]:
+def require(permission: Permission) -> Callable[..., Awaitable[User]]:
     """A dependency that resolves the current user (401) and then checks the role (403)."""
 
-    async def dependency(user: CurrentUser) -> User:
+    async def dependency(request: Request, user: CurrentUser) -> User:
         if not has_permission(user, permission):
+            # Written before the 403: background tasks don't run on error responses.
+            row = build_row(
+                user,
+                AuditEntry(AuditAction.ACCESS_DENIED, entity=permission),
+                getattr(request.state, "request_id", None),
+            )
+            await write_now(request.app.state.sessionmaker, row)
             raise PermissionDeniedError
         return user
 

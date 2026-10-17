@@ -8,7 +8,7 @@ from alembic import command
 from cryptography.fernet import Fernet
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.crypto import FernetFieldCipher
@@ -90,6 +90,13 @@ async def api(app: FastAPI, db_session: AsyncSession) -> AsyncIterator[httpx2.As
         yield db_session
 
     app.dependency_overrides[get_session] = test_session
+    # Sessions the app opens itself (e.g. background audit writes) join the test's
+    # transaction through savepoints, so their commits are rolled back too.
+    app.state.sessionmaker = async_sessionmaker(
+        bind=await db_session.connection(),
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
     transport = httpx2.ASGITransport(app=app)
     async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client

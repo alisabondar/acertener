@@ -1,5 +1,6 @@
 """All ORM models. Importing this package registers every table on `Base.metadata`."""
 
+from app.db.models.audit import AuditLog
 from app.db.models.base import Base
 from app.db.models.clinical import Allergy, Condition, Note, PatientSummary
 from app.db.models.patients import Patient, PatientNamePrefix
@@ -8,6 +9,7 @@ from app.db.models.staff import User
 
 __all__ = [
     "Allergy",
+    "AuditLog",
     "Base",
     "CareTeamMember",
     "Condition",

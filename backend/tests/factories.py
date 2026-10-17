@@ -2,8 +2,10 @@ import itertools
 from datetime import date
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.audit import Audit
 from app.crypto import FieldCipher
 from app.db.models import Patient, User
 from app.patients.repository import NewPatient, PatientRepository
@@ -32,3 +34,13 @@ async def create_patient(session: AsyncSession, cipher: FieldCipher, **overrides
     }
     fields.update(overrides)
     return await PatientRepository(session, cipher).create(NewPatient(**fields))
+
+
+async def make_audit(session: AsyncSession, user: User) -> Audit:
+    """An Audit whose own writes join the test's transaction through savepoints."""
+    sessionmaker = async_sessionmaker(
+        bind=await session.connection(),
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    return Audit(user, session, BackgroundTasks(), sessionmaker)
