@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from app.config import Settings
-from app.errors import AppError, ConflictError, NotFoundError
+from app.errors import AppError, ConflictError, NotAuthenticatedError, NotFoundError
 from app.logging import JsonFormatter
 from app.main import create_app
 
@@ -33,6 +33,7 @@ def _app_with_test_routes(settings: Settings) -> FastAPI:
         errors: dict[str, AppError] = {
             "not-found": NotFoundError(),
             "conflict": ConflictError(detail="Record changed since you loaded it"),
+            "unauthenticated": NotAuthenticatedError(),
         }
         raise errors[kind]
 
@@ -137,3 +138,10 @@ def test_unhandled_error_is_generic_500_and_logged_without_leaking(
     assert all(
         e["request_id"] == body["request_id"] for e in logged if e["logger"].startswith("app.")
     )
+
+
+def test_unauthenticated_responses_say_how_to_authenticate(error_client: TestClient) -> None:
+    response = error_client.get("/raise/unauthenticated")
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == 'Persona realm="demo"'

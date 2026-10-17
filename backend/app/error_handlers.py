@@ -51,7 +51,7 @@ def _field_key(loc: Sequence[str | int]) -> str:
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error(request: Request, exc: AppError) -> JSONResponse:
-        return problem(request, exc.code.status, exc.code.name, exc.detail)
+        return problem(request, exc.code.status, exc.code.name, exc.detail, headers=exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

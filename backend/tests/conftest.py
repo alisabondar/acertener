@@ -2,6 +2,7 @@ import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
+import httpx2
 import pytest
 from alembic import command
 from cryptography.fernet import Fernet
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.crypto import FernetFieldCipher
 from app.db import create_engine
+from app.db.session import get_session
 from app.db.types import set_field_cipher
 from app.main import create_app
 from tests.helpers import alembic_config
@@ -27,7 +29,9 @@ def anyio_backend() -> str:
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    return Settings(_env_file=None, database_url=TEST_DATABASE_URL, keys_dir=tmp_path / "keys")
+    return Settings(
+        _env_file=None, env="test", database_url=TEST_DATABASE_URL, keys_dir=tmp_path / "keys"
+    )
 
 
 @pytest.fixture
@@ -65,3 +69,24 @@ async def db_session(migrated_database: str) -> AsyncIterator[AsyncSession]:
             await session.close()
             await transaction.rollback()
     await engine.dispose()
+
+
+@pytest.fixture
+def demo_mode() -> bool:
+    return True
+
+
+@pytest.fixture
+async def api(
+    settings: Settings, db_session: AsyncSession, demo_mode: bool
+) -> AsyncIterator[httpx2.AsyncClient]:
+    """The app called in-process, sharing the test's rolled-back database session."""
+    app = create_app(settings.model_copy(update={"demo_mode": demo_mode}))
+
+    async def test_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = test_session
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client

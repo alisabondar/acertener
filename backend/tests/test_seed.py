@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto import FieldCipher
 from app.db.models import CareTeamMember, Note, Patient, User, Visit, Vital
-from scripts.seed import PERSONAS, require_development, seed
+from app.demo.personas import PERSONAS
+from scripts.seed import require_development, seed
 
 TODAY = date(2026, 10, 17)
 
@@ -55,9 +56,7 @@ async def test_reseeding_gives_identical_results(
 
 @pytest.mark.db
 @pytest.mark.anyio
-async def test_personas_and_developer_are_seeded(
-    db_session: AsyncSession, field_cipher: FieldCipher
-) -> None:
+async def test_personas_are_seeded(db_session: AsyncSession, field_cipher: FieldCipher) -> None:
     await seed(db_session, field_cipher, today=TODAY)
 
     users = {u.email: u for u in await db_session.scalars(select(User))}
@@ -67,7 +66,7 @@ async def test_personas_and_developer_are_seeded(
             persona.role,
             persona.credential,
         )
-    assert [u.email for u in users.values() if u.is_developer] == ["developer@demo.clinic"]
+    assert "developer@demo.clinic" not in users
 
 
 @pytest.mark.db
