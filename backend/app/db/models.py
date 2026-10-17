@@ -4,6 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     LargeBinary,
@@ -86,3 +87,17 @@ class Patient(Base):
             name="archive_reason",
         ),
     )
+
+
+class PatientNamePrefix(Base):
+    """Blind index: one fingerprint per name prefix, so encrypted names can be prefix-searched."""
+
+    __tablename__ = "patient_name_prefixes"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), primary_key=True
+    )
+    purpose: Mapped[str] = mapped_column(Text, primary_key=True)
+    fp: Mapped[bytes] = mapped_column(LargeBinary, primary_key=True)
+
+    __table_args__ = (Index(None, "purpose", "fp"),)
