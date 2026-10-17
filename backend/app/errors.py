@@ -1,5 +1,6 @@
 from enum import Enum, unique
 from http import HTTPStatus
+from typing import ClassVar
 
 
 @unique
@@ -11,6 +12,7 @@ class ErrorCode(Enum):
         HTTPStatus.UNPROCESSABLE_ENTITY,
         "The request breaks a business rule.",
     )
+    NOT_AUTHENTICATED = (HTTPStatus.UNAUTHORIZED, "Pick a persona to continue (demo mode).")
     PERMISSION_DENIED = (HTTPStatus.FORBIDDEN, "You don't have permission to do this.")
     NOT_FOUND = (HTTPStatus.NOT_FOUND, "The resource was not found.")
     METHOD_NOT_ALLOWED = (HTTPStatus.METHOD_NOT_ALLOWED, "This method is not allowed here.")
@@ -27,6 +29,7 @@ class AppError(Exception):
     """Base for expected errors. `detail` must never contain PHI."""
 
     code: ErrorCode = ErrorCode.INTERNAL_ERROR
+    headers: ClassVar[dict[str, str]] = {}
 
     def __init__(self, detail: str | None = None) -> None:
         self.detail = detail or self.code.detail
@@ -51,3 +54,9 @@ class BusinessRuleError(AppError):
 
 class ServiceUnavailableError(AppError):
     code = ErrorCode.SERVICE_UNAVAILABLE
+
+
+class NotAuthenticatedError(AppError):
+    code = ErrorCode.NOT_AUTHENTICATED
+    # HTTP requires a 401 to name the scheme; ours is the demo persona header.
+    headers: ClassVar[dict[str, str]] = {"WWW-Authenticate": 'Persona realm="demo"'}

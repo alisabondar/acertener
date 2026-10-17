@@ -3,11 +3,12 @@ from datetime import UTC, date, datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import AuditAction, AuditEntry
 from app.crypto import FieldCipher
 from app.db.models import Note, PatientSummary, Visit
 from app.patients.repository import NewPatient, PatientRepository
 from scripts.prove_encryption import database_as_text
-from tests.factories import make_user
+from tests.factories import make_audit, make_user
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
 
@@ -41,6 +42,16 @@ async def test_no_plaintext_phi_at_rest(
     provider = make_user()
     db_session.add(provider)
     await db_session.flush()
+    audit = await make_audit(db_session, provider)
+    await audit.record_change(
+        AuditEntry(
+            AuditAction.UPDATE,
+            "patient",
+            patient.id,
+            patient.id,
+            {"last_name": ("Zyxcanary", "Zyxcanary-Smith"), "phone": ("555-867-5309", None)},
+        )
+    )
     db_session.add(
         Visit(
             patient_id=patient.id,

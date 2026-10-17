@@ -23,6 +23,8 @@ uv run uvicorn --factory app.main:create_app --reload
 ```
 
 - API: http://localhost:8000 · Interactive docs: http://localhost:8000/docs
+- No login: `GET /api/v1/personas` lists the demo personas; send `X-Persona: <id>` to act as one
+  (in `/docs`, add the header per request). Every action is permission-checked and audited.
 - Health: `GET /health` (process is up) and `GET /health/ready` (database reachable, otherwise `503`)
 - Encryption keys are created in `.keys/` on first start. Patient identifiers and clinical free text
   are encrypted in the database; only the app can read them.
@@ -47,6 +49,7 @@ All config comes from environment variables. See [`.env.example`](.env.example).
 | Variable | Purpose |
 |---|---|
 | `ENV` | `development` (default), `test`, or `production`. Seeding runs only in `development`. |
+| `DEMO_MODE` | Turns on the persona picker; there's no login in the MVP. Refused when `ENV=production` or `ENV` is unset. |
 | `KEYS_DIR` | Where encryption keys live (default `.keys/`). **Deleting them makes encrypted data unreadable**, so reset keys and the database together. |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Local Docker Postgres credentials (dev only) |
 | `POSTGRES_PORT` | Host port for Postgres. If you change it, update both URLs below. |

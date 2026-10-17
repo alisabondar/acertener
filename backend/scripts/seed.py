@@ -29,28 +29,13 @@ from app.db.models import (
     Vital,
 )
 from app.db.types import set_field_cipher
+from app.demo.personas import PERSONAS
 from app.patients.repository import NewPatient, PatientRepository
 
 SEED = 20261017
 DEFAULT_COUNT = 20
-DEVELOPER_EMAIL = "developer@demo.clinic"
 
 
-@dataclass(frozen=True)
-class Persona:
-    name: str
-    email: str
-    role: str
-    credential: str | None
-
-
-PERSONAS = [
-    Persona("Dr. Wei Chen", "chen@demo.clinic", "provider", "MD"),
-    Persona("Jordan Rivera", "rivera@demo.clinic", "provider", "NP"),
-    Persona("Sam Okafor", "okafor@demo.clinic", "nurse", "RN"),
-    Persona("Taylor Brooks", "brooks@demo.clinic", "front_desk", None),
-    Persona("Practice Admin", "admin@demo.clinic", "admin", None),
-]
 EXTRA_STAFF = [("provider", "MD"), ("provider", "PA"), ("nurse", "RN"), ("nurse", "MA")]
 
 VISIT_REASONS = [
@@ -115,9 +100,6 @@ class _Seeder:
         people = [
             User(name=p.name, email=p.email, role=p.role, credential=p.credential) for p in PERSONAS
         ]
-        people.append(
-            User(name="Developer", email=DEVELOPER_EMAIL, role="admin", is_developer=True)
-        )
         for n, (role, credential) in enumerate(EXTRA_STAFF, start=1):
             people.append(
                 User(
@@ -132,7 +114,7 @@ class _Seeder:
         by_email = {u.email: u for u in people}
         self.chen, self.rivera = by_email["chen@demo.clinic"], by_email["rivera@demo.clinic"]
         self.okafor = by_email["okafor@demo.clinic"]
-        extra = people[len(PERSONAS) + 1 :]
+        extra = people[len(PERSONAS) :]
         # Personas get most patients so their "My patients" and "My day" views are full.
         self.primary_rotation = [self.chen, self.rivera, self.chen, self.rivera] + [
             u for u in extra if u.role == "provider"
