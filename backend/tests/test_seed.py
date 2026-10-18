@@ -11,14 +11,15 @@ from app.demo.personas import PERSONAS
 from scripts.seed import require_development, seed
 
 TODAY = date(2026, 10, 17)
+SMALL = 20  # the default is 10,000; tests stay small
 
 
 async def _snapshot(session: AsyncSession) -> dict[str, list[tuple[Any, ...]]]:
-    """Seeded content keyed by natural keys (MRN, email), so server-generated ids don't matter."""
+    """Seeded content, including patient ids (the seed generates them deterministically)."""
     mrn = {p.id: p.mrn for p in await session.scalars(select(Patient))}
     email = {u.id: u.email for u in await session.scalars(select(User))}
     patients = [
-        (p.mrn, p.first_name, p.last_name, p.dob, p.gender, p.status, p.last_visit_at)
+        (p.id, p.mrn, p.first_name, p.last_name, p.dob, p.gender, p.status, p.last_visit_at)
         for p in await session.scalars(select(Patient))
     ]
     visits = [
@@ -46,18 +47,18 @@ async def test_reseeding_gives_identical_results(
     snapshots = []
     for _ in range(2):
         savepoint = await db_session.begin_nested()
-        await seed(db_session, field_cipher, today=TODAY)
+        await seed(db_session, field_cipher, count=SMALL, today=TODAY)
         snapshots.append(await _snapshot(db_session))
         await savepoint.rollback()
 
     assert snapshots[0] == snapshots[1]
-    assert len(snapshots[0]["patients"]) == 20
+    assert len(snapshots[0]["patients"]) == SMALL
 
 
 @pytest.mark.db
 @pytest.mark.anyio
 async def test_personas_are_seeded(db_session: AsyncSession, field_cipher: FieldCipher) -> None:
-    await seed(db_session, field_cipher, today=TODAY)
+    await seed(db_session, field_cipher, count=SMALL, today=TODAY)
 
     users = {u.email: u for u in await db_session.scalars(select(User))}
 
@@ -74,14 +75,14 @@ async def test_personas_are_seeded(db_session: AsyncSession, field_cipher: Field
 async def test_seeded_data_is_clinically_consistent(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
-    await seed(db_session, field_cipher, today=TODAY)
+    await seed(db_session, field_cipher, count=SMALL, today=TODAY)
 
     primaries = await db_session.execute(
         select(CareTeamMember.patient_id, func.count())
         .where(CareTeamMember.role == "primary_provider", CareTeamMember.end_date.is_(None))
         .group_by(CareTeamMember.patient_id)
     )
-    assert sorted(n for _, n in primaries) == [1] * 20
+    assert sorted(n for _, n in primaries) == [1] * SMALL
 
     vitals_on_open_visits = await db_session.scalar(
         select(func.count())
@@ -120,12 +121,12 @@ async def test_seeded_data_is_clinically_consistent(
 async def test_seeding_twice_adds_nothing(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
-    await seed(db_session, field_cipher, today=TODAY)
+    await seed(db_session, field_cipher, count=SMALL, today=TODAY)
 
-    second = await seed(db_session, field_cipher, today=TODAY)
+    second = await seed(db_session, field_cipher, count=SMALL, today=TODAY)
 
     assert second.skipped
-    assert await db_session.scalar(select(func.count()).select_from(Patient)) == 20
+    assert await db_session.scalar(select(func.count()).select_from(Patient)) == SMALL
 
 
 @pytest.mark.db
@@ -133,9 +134,9 @@ async def test_seeding_twice_adds_nothing(
 async def test_seed_works_on_a_leap_day(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
-    result = await seed(db_session, field_cipher, today=date(2028, 2, 29))
+    result = await seed(db_session, field_cipher, count=SMALL, today=date(2028, 2, 29))
 
-    assert result.patients == 20
+    assert result.patients == SMALL
 
 
 @pytest.mark.db

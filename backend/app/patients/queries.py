@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, Select, and_, exists, func, select
@@ -67,7 +68,13 @@ def _order_by(query: Select[Patient, bool], sort: Sort, order: Order) -> Select[
     return query.order_by(year, Patient.dob_fp, Patient.id)
 
 
-async def list_patients(
+@dataclass(frozen=True)
+class ListStatements:
+    total: Select[int]
+    page: Select[Patient, bool]
+
+
+def build_list_statements(
     session: AsyncSession,
     cipher: FieldCipher,
     user: User,
@@ -75,7 +82,8 @@ async def list_patients(
     today: date,
     tz: ZoneInfo,
     terms: SearchTerms | None = None,
-) -> tuple[list[ListedPatient], int]:
+) -> ListStatements:
+    """The SQL behind the list endpoints, built but not run (also used by EXPLAIN tooling)."""
     on_team = on_care_team(user)
     conditions: list[ColumnElement[bool]] = []
     if params.scope is Scope.MY:
@@ -90,14 +98,27 @@ async def list_patients(
         conditions += PatientRepository(session, cipher).search_conditions(
             terms.last_name, terms.first_name, terms.dob, terms.mrn
         )
-
-    total = await session.scalar(select(func.count()).select_from(Patient).where(*conditions))
-    query = _order_by(
+    page = _order_by(
         select(Patient, on_team.label("on_team")).where(*conditions), params.sort, params.order
     )
-    rows = await session.execute(
-        query.offset((params.page - 1) * params.page_size).limit(params.page_size)
+    return ListStatements(
+        total=select(func.count()).select_from(Patient).where(*conditions),
+        page=page.offset((params.page - 1) * params.page_size).limit(params.page_size),
     )
+
+
+async def list_patients(
+    session: AsyncSession,
+    cipher: FieldCipher,
+    user: User,
+    params: ListParams,
+    today: date,
+    tz: ZoneInfo,
+    terms: SearchTerms | None = None,
+) -> tuple[list[ListedPatient], int]:
+    statements = build_list_statements(session, cipher, user, params, today, tz, terms)
+    total = await session.scalar(statements.total)
+    rows = await session.execute(statements.page)
     return [ListedPatient(p, on) for p, on in rows], total or 0
 
 
@@ -108,18 +129,27 @@ class FilterCounts:
     archived: int
 
 
-async def count_filters(
-    session: AsyncSession, user: User, scope: Scope, today: date, tz: ZoneInfo
-) -> FilterCounts:
+STATUSES = ("active", "inactive", "deceased")
+
+
+def build_counts_statement(
+    user: User, scope: Scope, today: date, tz: ZoneInfo
+) -> Select[*tuple[Any, ...]]:
     """Every quick-filter count in one query, using the same conditions as the list."""
     current = Patient.archived_at.is_(None)
-    statuses = ("active", "inactive", "deceased")
-    query = select(
+    query: Select[*tuple[Any, ...]] = select(
         func.count().filter(and_(current, _visit_on(today, tz))),
-        *(func.count().filter(and_(current, Patient.status == s)) for s in statuses),
+        *(func.count().filter(and_(current, Patient.status == s)) for s in STATUSES),
         func.count().filter(Patient.archived_at.is_not(None)),
     ).select_from(Patient)
     if scope is Scope.MY:
         query = query.where(on_care_team(user))
-    today_visits, *by_status, archived = (await session.execute(query)).one()
-    return FilterCounts(today_visits, dict(zip(statuses, by_status, strict=True)), archived)
+    return query
+
+
+async def count_filters(
+    session: AsyncSession, user: User, scope: Scope, today: date, tz: ZoneInfo
+) -> FilterCounts:
+    row = (await session.execute(build_counts_statement(user, scope, today, tz))).one()
+    today_visits, *by_status, archived = row
+    return FilterCounts(today_visits, dict(zip(STATUSES, by_status, strict=True)), archived)

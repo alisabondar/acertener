@@ -73,14 +73,28 @@ class PatientRepository:
         self._session = session
         self._cipher = cipher
 
-    async def create(self, data: NewPatient) -> Patient:
-        patient = Patient(**asdict(data))
+    def build(
+        self, data: NewPatient, patient_id: uuid.UUID
+    ) -> tuple[Patient, list[PatientNamePrefix]]:
+        """A patient and its prefix rows with every search field derived, not yet added.
+
+        Bulk loads add these in batches; `create` uses the same path for one patient.
+        """
+        patient = Patient(id=patient_id, **asdict(data))
         self._derive_search_fields(patient, data.last_name, data.dob, data.mrn)
+        prefixes = [
+            row
+            for field, purpose in PREFIX_PURPOSES.items()
+            for row in self._prefix_rows(patient_id, purpose, getattr(data, field))
+        ]
+        return patient, prefixes
+
+    async def create(self, data: NewPatient) -> Patient:
+        patient, prefixes = self.build(data, uuid.uuid4())
         async with self._savepoint():
             self._session.add(patient)
             await self._session.flush()
-            for field, purpose in PREFIX_PURPOSES.items():
-                self._add_prefixes(patient.id, purpose, getattr(data, field))
+            self._session.add_all(prefixes)
         return patient
 
     async def get(self, patient_id: uuid.UUID) -> Patient | None:
@@ -180,13 +194,18 @@ class PatientRepository:
         if mrn is not None:
             patient.mrn_fp = self._cipher.fingerprint(Purpose.MRN, mrn)
 
-    def _add_prefixes(self, patient_id: uuid.UUID, purpose: Purpose, value: str) -> None:
-        self._session.add_all(
+    def _prefix_rows(
+        self, patient_id: uuid.UUID, purpose: Purpose, value: str
+    ) -> list[PatientNamePrefix]:
+        return [
             PatientNamePrefix(
                 patient_id=patient_id, purpose=purpose, fp=self._cipher.fingerprint(purpose, p)
             )
             for p in name_prefixes(value)
-        )
+        ]
+
+    def _add_prefixes(self, patient_id: uuid.UUID, purpose: Purpose, value: str) -> None:
+        self._session.add_all(self._prefix_rows(patient_id, purpose, value))
 
     def _fingerprint_dob(self, dob: date) -> bytes:
         return self._cipher.fingerprint(Purpose.DOB, dob.isoformat())

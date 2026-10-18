@@ -33,6 +33,7 @@ class AuditLog(Base):
     changes: Mapped[str | None] = mapped_column(EncryptedText)
 
     __table_args__ = (
-        Index(None, "patient_id", "occurred_at"),
-        Index(None, "actor_id", "occurred_at"),
+        # Ordered by id (which follows time) to match the newest-first keyset paging.
+        Index(None, "patient_id", "id"),
+        Index(None, "actor_id", "id"),
     )

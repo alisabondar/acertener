@@ -1,10 +1,13 @@
+import uuid
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto import FieldCipher
+from app.db.models import PatientNamePrefix
 from app.patients.repository import DuplicateMrnError, NewPatient, PatientRepository
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
@@ -141,3 +144,26 @@ async def test_other_database_errors_are_not_mistaken_for_duplicate_mrns(
 
     with pytest.raises(IntegrityError):
         await repo.update(patient.id, status="asleep")
+
+
+async def test_build_derives_the_same_search_data_as_create(
+    repo: PatientRepository, db_session: AsyncSession
+) -> None:
+    data = new_patient(first_name="Adeline", last_name="Smithers")
+    created = await repo.create(data)
+    created_prefixes = set(
+        await db_session.scalars(
+            select(PatientNamePrefix.fp).where(PatientNamePrefix.patient_id == created.id)
+        )
+    )
+
+    built, prefixes = repo.build(data, uuid.uuid4())
+
+    assert (built.last_name_fp, built.dob_fp, built.mrn_fp, built.birth_year) == (
+        created.last_name_fp,
+        created.dob_fp,
+        created.mrn_fp,
+        created.birth_year,
+    )
+    assert {p.fp for p in prefixes} == created_prefixes
+    assert {p.patient_id for p in prefixes} == {built.id}
