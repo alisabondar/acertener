@@ -1,5 +1,5 @@
 import itertools
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import BackgroundTasks
@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.audit import Audit
 from app.crypto import FieldCipher
-from app.db.models import Patient, User
+from app.db.models import CareTeamMember, Patient, User, Visit
 from app.patients.repository import NewPatient, PatientRepository
 
 _ids = itertools.count(1)
@@ -44,3 +44,30 @@ async def make_audit(session: AsyncSession, user: User) -> Audit:
         join_transaction_mode="create_savepoint",
     )
     return Audit(user, session, BackgroundTasks(), sessionmaker)
+
+
+async def add_to_care_team(
+    session: AsyncSession, patient: Patient, user: User, role: str = "nurse"
+) -> None:
+    session.add(CareTeamMember(patient_id=patient.id, user_id=user.id, role=role))
+    await session.flush()
+
+
+async def add_visit(
+    session: AsyncSession, patient: Patient, provider: User, when: datetime, status: str
+) -> None:
+    session.add(
+        Visit(patient_id=patient.id, provider_id=provider.id, scheduled_at=when, status=status)
+    )
+    await session.flush()
+
+
+async def add_user(session: AsyncSession, role: str = "provider", **overrides: Any) -> User:
+    user = make_user(role=role, **overrides)
+    session.add(user)
+    await session.flush()
+    return user
+
+
+def persona_headers(user: User) -> dict[str, str]:
+    return {"X-Persona": str(user.id)}

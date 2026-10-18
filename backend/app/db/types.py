@@ -19,7 +19,7 @@ def set_field_cipher(cipher: FieldCipher | None) -> None:
     _cipher = cipher
 
 
-def _get_cipher() -> FieldCipher:
+def get_field_cipher() -> FieldCipher:
     if _cipher is None:
         raise CipherNotConfiguredError("no field cipher registered; refusing to store plaintext")
     return _cipher
@@ -32,10 +32,10 @@ class EncryptedText(TypeDecorator[str]):
     cache_ok = True
 
     def process_bind_param(self, value: str | None, dialect: Dialect) -> str | None:
-        return None if value is None else _get_cipher().encrypt(value)
+        return None if value is None else get_field_cipher().encrypt(value)
 
     def process_result_value(self, value: Any | None, dialect: Dialect) -> str | None:
-        return None if value is None else _get_cipher().decrypt(value)
+        return None if value is None else get_field_cipher().decrypt(value)
 
 
 class EncryptedDate(TypeDecorator[date]):

@@ -6,9 +6,13 @@ Run from backend/:  uv run python -m scripts.seed [--count 20] [--reset]
 import argparse
 import asyncio
 import random
+import time as clock
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from faker import Faker
 from sqlalchemy import func, select, text
@@ -30,10 +34,13 @@ from app.db.models import (
 )
 from app.db.types import set_field_cipher
 from app.demo.personas import PERSONAS
+from app.patients.queries import practice_today
 from app.patients.repository import NewPatient, PatientRepository
 
 SEED = 20261017
-DEFAULT_COUNT = 20
+DEFAULT_COUNT = 10_000
+BATCH_SIZE = 1_000
+TODAYS_VISITS = 16
 
 
 EXTRA_STAFF = [("provider", "MD"), ("provider", "PA"), ("nurse", "RN"), ("nurse", "MA")]
@@ -82,19 +89,27 @@ def require_development(env: str) -> None:
         raise SystemExit(f"Refusing to seed: ENV is {env!r}, and seeding runs only in development.")
 
 
-def _at(day: date, hour: int, minute: int = 0) -> datetime:
-    return datetime.combine(day, time(hour, minute), tzinfo=UTC)
-
-
 class _Seeder:
-    def __init__(self, session: AsyncSession, cipher: FieldCipher, today: date) -> None:
+    """Builds rows in memory and writes them in FK-ordered stages, one batch at a time."""
+
+    def __init__(self, session: AsyncSession, cipher: FieldCipher, today: date, tz: tzinfo) -> None:
         self.session = session
         self.repo = PatientRepository(session, cipher)
         self.today = today
+        self.tz = tz
         # Reproducible synthetic data, not security: predictability is the point.
         self.rng = random.Random(SEED)  # noqa: S311
         self.fake = Faker()
         self.fake.seed_instance(SEED)
+        # Rows waiting to be written, by stage: each stage only references earlier ones.
+        self.stages: list[list[Base]] = [[], [], []]
+
+    def _uuid(self) -> uuid.UUID:
+        return uuid.UUID(int=self.rng.getrandbits(128), version=4)
+
+    def _at(self, day: date, hour: int, minute: int = 0) -> datetime:
+        """A clinic-hours time on `day`, in the practice's timezone."""
+        return datetime.combine(day, time(hour, minute), tzinfo=self.tz)
 
     async def staff(self) -> None:
         people = [
@@ -121,10 +136,10 @@ class _Seeder:
         ]
         self.other_nurses = [u for u in extra if u.role == "nurse"]
 
-    async def patient(self, i: int, count: int) -> None:
+    def patient(self, i: int, count: int) -> None:
         age = self.rng.randint(1, 95)
         dob = self.today - timedelta(days=age * 365 + self.rng.randint(0, 364))
-        patient = await self.repo.create(
+        patient, prefixes = self.repo.build(
             NewPatient(
                 first_name=self.fake.first_name(),
                 last_name=self.fake.last_name(),
@@ -137,32 +152,33 @@ class _Seeder:
                 city=self.fake.city(),
                 state=self.fake.state_abbr(),
                 postal_code=self.fake.zipcode(),
-            )
+            ),
+            self._uuid(),
         )
         primary = self.primary_rotation[i % len(self.primary_rotation)]
         nurses = [self.okafor] if i % 2 == 0 else []
         nurses += self.rng.sample(self.other_nurses, k=1 if nurses else self.rng.randint(1, 2))
-        self.session.add(
+        self.stages[1] += prefixes
+        self.stages[1].append(
             CareTeamMember(patient_id=patient.id, user_id=primary.id, role="primary_provider")
         )
-        self.session.add_all(
+        self.stages[1] += [
             CareTeamMember(patient_id=patient.id, user_id=n.id, role="nurse") for n in nurses
-        )
+        ]
 
         # The last three patients cover the status mix: deceased, inactive, and long unseen.
         special = count - i
         if special == 1:
-            visit_days, status = [730], "deceased"
+            visit_days, patient.status = [730], "deceased"
         elif special == 2:
-            visit_days, status = [1825], "inactive"
+            visit_days, patient.status = [1825], "inactive"
         elif special == 3:
-            visit_days, status = [1460], "active"
+            visit_days = [1460]
         else:
             visit_days = sorted(self.rng.sample(range(14, 900), k=self.rng.randint(1, 4)))
-            status = "active"
 
         completed = [
-            await self._past_visit(
+            self._past_visit(
                 patient,
                 primary,
                 nurses[0],
@@ -172,18 +188,19 @@ class _Seeder:
             )
             for d in visit_days
         ]
-        if primary in (self.chen, self.rivera) and i < count * 3 // 5:
-            self.session.add(
+        # A realistic day: a handful of today's visits for the persona providers.
+        if primary in (self.chen, self.rivera) and i < min(count * 3 // 5, TODAYS_VISITS):
+            self.stages[1].append(
                 Visit(
                     patient_id=patient.id,
                     provider_id=primary.id,
-                    scheduled_at=_at(self.today, 9 + (i // 2) % 8, 30 * (i % 2)),
+                    scheduled_at=self._at(self.today, 9 + (i // 2) % 8, 30 * (i % 2)),
                     status=self.rng.choice(["scheduled", "scheduled", "checked_in"]),
                     reason=self.rng.choice(VISIT_REASONS),
                 )
             )
         for substance, reaction, severity in self.rng.sample(ALLERGIES, k=self.rng.randint(0, 2)):
-            self.session.add(
+            self.stages[2].append(
                 Allergy(
                     patient_id=patient.id,
                     substance=substance,
@@ -193,30 +210,30 @@ class _Seeder:
                 )
             )
         for code, name in self.rng.sample(CONDITIONS, k=self.rng.randint(0, 3)):
-            self.session.add(
+            self.stages[2].append(
                 Condition(patient_id=patient.id, icd10_code=code, name=name, recorded_by=primary.id)
             )
-        last_visit = max((v for v in completed if v is not None), default=None)
-        await self.repo.update(patient.id, status=status, last_visit_at=last_visit)
+        patient.last_visit_at = max((v for v in completed if v is not None), default=None)
+        self.stages[0].append(patient)
 
-    async def _past_visit(
+    def _past_visit(
         self, patient: Patient, provider: User, nurse: User, day: date, *, allow_no_show: bool
     ) -> datetime | None:
-        when = _at(day, self.rng.randint(8, 16))
+        when = self._at(day, self.rng.randint(8, 16))
         no_show = allow_no_show and self.rng.random() < 0.1
         reason = self.rng.choice(VISIT_REASONS)
         visit = Visit(
+            id=self._uuid(),
             patient_id=patient.id,
             provider_id=provider.id,
             scheduled_at=when,
             status="no_show" if no_show else "completed",
             reason=reason,
         )
-        self.session.add(visit)
+        self.stages[1].append(visit)
         if no_show:
             return None
-        await self.session.flush()
-        self.session.add(
+        self.stages[2].append(
             Vital(
                 patient_id=patient.id,
                 visit_id=visit.id,
@@ -234,7 +251,7 @@ class _Seeder:
         )
         if self.rng.random() < 0.7:
             author = self.rng.choice([provider, nurse])
-            self.session.add(
+            self.stages[2].append(
                 Note(
                     patient_id=patient.id,
                     author_id=author.id,
@@ -246,18 +263,35 @@ class _Seeder:
             )
         return when
 
+    async def write_batch(self) -> None:
+        for stage in self.stages:
+            self.session.add_all(stage)
+            await self.session.flush()
+            for row in stage:
+                self.session.expunge(row)  # keep memory flat across a 10k+ load
+            stage.clear()
+
 
 async def seed(
-    session: AsyncSession, cipher: FieldCipher, *, count: int = DEFAULT_COUNT, today: date
+    session: AsyncSession,
+    cipher: FieldCipher,
+    *,
+    count: int = DEFAULT_COUNT,
+    today: date,
+    tz: tzinfo = UTC,
+    progress: Callable[[int, int], None] | None = None,
 ) -> SeedResult:
     """Insert the dataset unless patients already exist. The caller commits."""
     if await session.scalar(select(func.count()).select_from(Patient)):
         return SeedResult(skipped=True)
-    seeder = _Seeder(session, cipher, today)
+    seeder = _Seeder(session, cipher, today, tz)
     await seeder.staff()
     for i in range(count):
-        await seeder.patient(i, count)
-    await session.flush()
+        seeder.patient(i, count)
+        if (i + 1) % BATCH_SIZE == 0 or i + 1 == count:
+            await seeder.write_batch()
+            if progress is not None:
+                progress(i + 1, count)
     return SeedResult(skipped=False, patients=count)
 
 
@@ -277,20 +311,34 @@ async def main() -> None:
     keys = load_or_create_keys(settings.keys_dir)
     cipher = FernetFieldCipher(keys.field_keys, keys.fingerprint_key)
     set_field_cipher(cipher)
+    tz = ZoneInfo(settings.practice_timezone)
+    started = clock.monotonic()
+
+    def progress(done: int, total: int) -> None:
+        elapsed = clock.monotonic() - started
+        remaining = elapsed / done * (total - done)
+        print(f"  {done:>6}/{total} patients  {elapsed:5.1f}s elapsed  ~{remaining:4.0f}s left")
+
     engine = create_engine(settings.database_url)
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as session:
             if args.reset:
                 await reset(session)
-            result = await seed(session, cipher, count=args.count, today=date.today())
+            result = await seed(
+                session,
+                cipher,
+                count=args.count,
+                today=practice_today(datetime.now(UTC), tz),
+                tz=tz,
+                progress=progress,
+            )
             await session.commit()
     finally:
         await engine.dispose()
-    print(
-        "Already seeded; use --reset to start over."
-        if result.skipped
-        else f"Seeded {result.patients} patients."
-    )
+    if result.skipped:
+        print("Already seeded; use --reset to start over.")
+    else:
+        print(f"Seeded {result.patients} patients in {clock.monotonic() - started:.1f}s.")
 
 
 if __name__ == "__main__":

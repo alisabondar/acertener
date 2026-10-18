@@ -56,6 +56,11 @@ def build_row(actor: User, entry: AuditEntry, request_id: str | None) -> AuditLo
     )
 
 
+def changed_fields(row: AuditLog) -> list[str]:
+    """Names of the fields an entry changed. Never the values, which can be PHI."""
+    return sorted(json.loads(row.changes)) if row.changes else []
+
+
 async def write_now(sessionmaker: async_sessionmaker[AsyncSession], row: AuditLog) -> None:
     """Write one entry in its own transaction."""
     async with sessionmaker() as session:

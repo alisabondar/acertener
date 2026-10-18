@@ -62,6 +62,13 @@ class Patient(Base):
     __table_args__ = (
         # Leftmost prefix also serves last-name-only search.
         Index(None, "last_name_fp", "dob_fp"),
+        # The default patient list: current patients, most recently seen first.
+        Index(
+            "ix_patients_current_by_last_visit",
+            text("last_visit_at DESC NULLS LAST"),
+            "id",
+            postgresql_where=text("archived_at IS NULL"),
+        ),
         CheckConstraint(one_of("status", PATIENT_STATUSES), name="status"),
         CheckConstraint(
             f"archive_reason IS NULL OR {one_of('archive_reason', ARCHIVE_REASONS)}",

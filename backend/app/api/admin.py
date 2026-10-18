@@ -1,4 +1,3 @@
-import json
 import uuid
 from datetime import datetime
 from typing import Annotated
@@ -8,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import changed_fields
 from app.auth.permissions import Permission, require
 from app.db.models import AuditLog, User
 from app.db.session import get_session
@@ -34,8 +34,6 @@ class AuditPage(BaseModel):
 
 
 def _item(row: AuditLog) -> AuditItemOut:
-    # Field names only: admins have no clinical access, so old/new values stay hidden.
-    changed = sorted(json.loads(row.changes)) if row.changes else []
     return AuditItemOut(
         id=row.id,
         occurred_at=row.occurred_at,
@@ -46,7 +44,7 @@ def _item(row: AuditLog) -> AuditItemOut:
         entity_id=row.entity_id,
         patient_id=row.patient_id,
         request_id=row.request_id,
-        changed_fields=changed,
+        changed_fields=changed_fields(row),
     )
 
 

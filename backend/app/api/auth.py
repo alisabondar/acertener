@@ -1,31 +1,17 @@
-import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.identity import CurrentUser, require_demo_mode
-from app.auth.permissions import Permission, permissions_for
+from app.auth.permissions import permissions_for
 from app.db.models import User
 from app.db.session import get_session
 from app.demo.personas import PERSONAS
+from app.schemas.users import MeOut, UserOut
 
 router = APIRouter(tags=["auth"])
-
-
-class UserOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    name: str
-    role: str
-    credential: str | None
-
-
-class MeOut(UserOut):
-    permissions: list[Permission]
 
 
 @router.get("/auth/me")
