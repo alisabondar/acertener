@@ -16,7 +16,6 @@ repos:
         pass_filenames: false
       - id: frontend-check
         name: frontend vp check (lint, format, types)
-        # bunx runs the project's own vp (and its plugins), not a global install.
         entry: bash -c 'cd frontend && bunx vp check'
         language: system
         files: ^frontend/

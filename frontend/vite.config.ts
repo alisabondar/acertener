@@ -6,8 +6,8 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 
 // https://vite.dev/config/
 export default defineConfig({
-  // The backend writes openapi.json; CI diffs it byte-for-byte, so the formatter leaves it alone.
-  fmt: { ignorePatterns: ["src/api/openapi.json"] },
+  // Written by the backend's export script; left exactly as exported.
+  fmt: { ignorePatterns: ["src/api/openapi.json", "src/test/role-permissions.json"] },
   lint: {
     plugins: ["react", "typescript", "oxc"],
     ignorePatterns: ["src/api/schema.d.ts"],
@@ -44,7 +44,7 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   // In development the browser calls /api on its own origin; Vite forwards it to FastAPI.
-  server: { proxy: { "/api": "http://localhost:8000" } },
+  server: { proxy: { "/api": "http://127.0.0.1:8000" } },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],

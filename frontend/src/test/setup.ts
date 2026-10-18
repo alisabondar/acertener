@@ -1,6 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, vi } from "vite-plus/test";
+import { afterAll, afterEach, vi } from "vite-plus/test";
+
+import { personaStore } from "@/api/persona";
 
 import { server } from "./msw/server";
 
@@ -16,10 +18,12 @@ vi.stubGlobal("matchMedia", (query: string) => ({
   dispatchEvent: () => false,
 }));
 
+// Started on load, before test files import the API client, so it captures the mocked fetch.
 // Any request without a handler fails the test, so no test silently hits a real network.
-beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
+server.listen({ onUnhandledFrame: "error" });
 afterEach(() => {
   server.resetHandlers();
+  personaStore.set(null);
   cleanup();
 });
 afterAll(() => server.close());

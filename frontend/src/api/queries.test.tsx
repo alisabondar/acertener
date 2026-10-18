@@ -2,12 +2,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
-import { makeMe, makeProblem } from "@/test/factories";
+import { CHEN, makeMe, makeProblem } from "@/test/factories";
 import { server } from "@/test/msw/server";
 
 import { api } from "./index";
+import { personaStore } from "./persona";
 import { ApiProblem } from "./errors";
 import { queryKeys, useApiQuery } from "./queries";
 
@@ -20,10 +21,12 @@ function setup() {
 }
 
 describe("useApiQuery", () => {
+  beforeEach(() => personaStore.set(CHEN.id));
+
   it("returns the response data", async () => {
     const { wrapper } = setup();
     const { result } = renderHook(
-      () => useApiQuery(queryKeys.me(), (signal) => api.GET("/api/v1/auth/me", { signal })),
+      () => useApiQuery(queryKeys.me(CHEN.id), (signal) => api.GET("/api/v1/auth/me", { signal })),
       { wrapper },
     );
 
@@ -40,7 +43,7 @@ describe("useApiQuery", () => {
     const { wrapper } = setup();
 
     const { result } = renderHook(
-      () => useApiQuery(queryKeys.me(), (signal) => api.GET("/api/v1/auth/me", { signal })),
+      () => useApiQuery(queryKeys.me(CHEN.id), (signal) => api.GET("/api/v1/auth/me", { signal })),
       { wrapper },
     );
 
@@ -60,11 +63,11 @@ describe("useApiQuery", () => {
     const { client, wrapper } = setup();
 
     renderHook(
-      () => useApiQuery(queryKeys.me(), (signal) => api.GET("/api/v1/auth/me", { signal })),
+      () => useApiQuery(queryKeys.me(CHEN.id), (signal) => api.GET("/api/v1/auth/me", { signal })),
       { wrapper },
     );
     await waitFor(() => expect(requestSignal).toBeDefined());
-    await client.cancelQueries({ queryKey: queryKeys.me() });
+    await client.cancelQueries({ queryKey: queryKeys.me(CHEN.id) });
 
     expect(requestSignal?.aborted).toBe(true);
   });

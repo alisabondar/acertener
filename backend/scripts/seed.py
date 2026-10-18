@@ -89,6 +89,11 @@ def require_development(env: str) -> None:
         raise SystemExit(f"Refusing to seed: ENV is {env!r}, and seeding runs only in development.")
 
 
+def _staff_id(email: str) -> uuid.UUID:
+    """The same ID on every seed, so a persona chosen in an open tab survives a re-seed."""
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"mailto:{email}")
+
+
 class _Seeder:
     """Builds rows in memory and writes them in FK-ordered stages, one batch at a time."""
 
@@ -113,11 +118,19 @@ class _Seeder:
 
     async def staff(self) -> None:
         people = [
-            User(name=p.name, email=p.email, role=p.role, credential=p.credential) for p in PERSONAS
+            User(
+                id=_staff_id(p.email),
+                name=p.name,
+                email=p.email,
+                role=p.role,
+                credential=p.credential,
+            )
+            for p in PERSONAS
         ]
         for n, (role, credential) in enumerate(EXTRA_STAFF, start=1):
             people.append(
                 User(
+                    id=_staff_id(f"staff{n}@demo.clinic"),
                     name=self.fake.name(),
                     email=f"staff{n}@demo.clinic",
                     role=role,

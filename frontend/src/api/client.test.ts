@@ -5,7 +5,7 @@ import { server } from "@/test/msw/server";
 import { makeMe, makeProblem } from "@/test/factories";
 
 import { createApiClient } from "./client";
-import { ApiProblem, DemoModeOffError, NetworkError } from "./errors";
+import { ApiProblem, NetworkError } from "./errors";
 
 const PERSONA = "11111111-1111-4111-8111-111111111111";
 
@@ -62,18 +62,6 @@ describe("api client", () => {
     await expect(call).rejects.toBeInstanceOf(ApiProblem);
   });
 
-  it("treats 401 as demo mode being off", async () => {
-    server.use(
-      http.get("/api/v1/auth/me", () =>
-        HttpResponse.json(makeProblem(401, "NOT_AUTHENTICATED"), { status: 401 }),
-      ),
-    );
-
-    await expect(
-      createApiClient({ getPersona: () => null }).GET("/api/v1/auth/me"),
-    ).rejects.toBeInstanceOf(DemoModeOffError);
-  });
-
   it("reports network failures clearly", async () => {
     server.use(http.get("/api/v1/auth/me", () => HttpResponse.error()));
 
@@ -84,7 +72,7 @@ describe("api client", () => {
 
   it("fails any request that no test handler expects", async () => {
     await expect(
-      createApiClient({ getPersona: () => PERSONA }).GET("/api/v1/personas"),
+      createApiClient({ getPersona: () => PERSONA }).GET("/api/v1/admin/audit-log"),
     ).rejects.toBeInstanceOf(NetworkError);
   });
 });

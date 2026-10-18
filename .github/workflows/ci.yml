@@ -67,10 +67,10 @@ jobs:
         run: uv run mypy
       - name: Test (with coverage gate)
         run: uv run pytest --cov
-      - name: Committed OpenAPI schema matches the API
+      - name: Committed API contract (schema, role permissions) matches the API
         run: |
           uv run python -m scripts.export_openapi
-          git diff --exit-code -- ../frontend/src/api/openapi.json
+          git diff --exit-code -- ../frontend/src/api/openapi.json ../frontend/src/test/role-permissions.json
       - name: Security modules need 100% branch coverage
         run: uv run coverage report --include="app/crypto/*,app/auth/permissions.py" --fail-under=100
 

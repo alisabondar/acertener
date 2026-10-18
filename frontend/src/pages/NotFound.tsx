@@ -11,7 +11,7 @@ export function NotFound() {
         to="/"
         className="mt-6 inline-block font-medium text-primary underline underline-offset-4"
       >
-        Go to My day
+        Go to your home page
       </Link>
     </section>
   );

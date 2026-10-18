@@ -38,13 +38,8 @@ export class ApiProblem extends Error {
       requestId: typeof request_id === "string" ? request_id : response.headers.get("X-Request-ID"),
       extras,
     };
-    return response.status === 401 ? new DemoModeOffError(init) : new ApiProblem(init);
+    return new ApiProblem(init);
   }
-}
-
-/** The API refused the persona: demo mode is off, so there's no way in (no login in the MVP). */
-export class DemoModeOffError extends ApiProblem {
-  override readonly name = "DemoModeOffError";
 }
 
 /** The request never got a response (offline, server down, CORS). */

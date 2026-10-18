@@ -10,7 +10,7 @@ type Scope = components["schemas"]["Scope"];
  * (e.g. every patient query after a write: queryKeys.patients.all).
  */
 export const queryKeys = {
-  me: () => ["me"] as const,
+  me: (personaId: string) => ["me", personaId] as const,
   personas: () => ["personas"] as const,
   patients: {
     all: ["patients"] as const,
@@ -21,16 +21,26 @@ export const queryKeys = {
 };
 
 /**
- * TanStack Query over an openapi-fetch call. Errors arrive already typed (ApiProblem,
- * DemoModeOffError, NetworkError) because the client middleware throws them. Pass `signal`
+ * TanStack Query over an openapi-fetch call. Errors arrive already typed (ApiProblem or
+ * NetworkError) because the client middleware throws them. Pass `signal`
  * to the call so a cancelled or superseded query aborts its request.
  */
 export function useApiQuery<T>(
   queryKey: QueryKey,
   call: (signal: AbortSignal) => Promise<{ data?: T }>,
+  {
+    enabled = true,
+    keepPrevious = false,
+  }: {
+    enabled?: boolean;
+    /** While a new key loads, keep returning the previous key's data (isPlaceholderData). */
+    keepPrevious?: boolean;
+  } = {},
 ): UseQueryResult<T> {
-  return useQuery({
+  return useQuery<T>({
     queryKey,
+    enabled,
+    placeholderData: (previous) => (keepPrevious ? previous : undefined),
     queryFn: async ({ signal }) => {
       const { data } = await call(signal);
       if (data === undefined) throw new Error("The API returned no data");

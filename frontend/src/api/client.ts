@@ -13,9 +13,7 @@ type ClientOptions = {
 };
 
 export function createApiClient({ getPersona, baseUrl = window.location.origin }: ClientOptions) {
-  // Look fetch up per request, not once at creation, so anything that wraps it later
-  // (test mocks, monitoring) still sees every call.
-  const client = createClient<paths>({ baseUrl, fetch: (request) => globalThis.fetch(request) });
+  const client = createClient<paths>({ baseUrl });
   const middleware: Middleware = {
     onRequest({ request }) {
       const persona = getPersona();

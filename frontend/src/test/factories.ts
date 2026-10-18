@@ -1,16 +1,51 @@
 import type { components } from "@/api/schema";
 
-type Schemas = components["schemas"];
+import rolePermissions from "./role-permissions.json";
 
-export function makeMe(overrides: Partial<Schemas["MeOut"]> = {}): Schemas["MeOut"] {
-  return {
-    id: "00000000-0000-4000-8000-000000000001",
-    name: "Dr. Wei Chen",
-    role: "provider",
-    credential: "MD",
-    permissions: ["VIEW_DEMOGRAPHICS", "VIEW_CLINICAL"],
-    ...overrides,
-  };
+type Schemas = components["schemas"];
+type Permission = Schemas["Permission"];
+export type Persona = Schemas["UserOut"];
+
+// Exported from the backend's permission matrix (scripts/export_openapi), so handlers answer
+// /auth/me exactly as the API would.
+const ROLE_PERMISSIONS = rolePermissions as Record<string, Permission[]>;
+
+export const CHEN: Persona = {
+  id: "00000000-0000-4000-8000-000000000001",
+  name: "Dr. Wei Chen",
+  role: "provider",
+  credential: "MD",
+};
+export const RIVERA: Persona = {
+  id: "00000000-0000-4000-8000-000000000002",
+  name: "Jordan Rivera",
+  role: "provider",
+  credential: "NP",
+};
+export const OKAFOR: Persona = {
+  id: "00000000-0000-4000-8000-000000000003",
+  name: "Sam Okafor",
+  role: "nurse",
+  credential: "RN",
+};
+export const BROOKS: Persona = {
+  id: "00000000-0000-4000-8000-000000000004",
+  name: "Taylor Brooks",
+  role: "front_desk",
+  credential: null,
+};
+export const ADMIN: Persona = {
+  id: "00000000-0000-4000-8000-000000000005",
+  name: "Practice Admin",
+  role: "admin",
+  credential: null,
+};
+
+/** The "View as" choices, in the order the API returns them. */
+export const PERSONAS = [CHEN, RIVERA, OKAFOR, BROOKS, ADMIN];
+
+export function makeMe(persona: Persona = CHEN): Schemas["MeOut"] {
+  return { ...persona, permissions: ROLE_PERMISSIONS[persona.role] ?? [] };
 }
 
 export function makeProblem(

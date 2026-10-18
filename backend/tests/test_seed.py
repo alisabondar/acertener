@@ -72,6 +72,21 @@ async def test_personas_are_seeded(db_session: AsyncSession, field_cipher: Field
 
 @pytest.mark.db
 @pytest.mark.anyio
+async def test_staff_keep_their_ids_across_reseeds(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    runs = []
+    for _ in range(2):
+        savepoint = await db_session.begin_nested()
+        await seed(db_session, field_cipher, count=SMALL, today=TODAY)
+        runs.append({u.email: u.id for u in await db_session.scalars(select(User))})
+        await savepoint.rollback()
+
+    assert runs[0] == runs[1]
+
+
+@pytest.mark.db
+@pytest.mark.anyio
 async def test_seeded_data_is_clinically_consistent(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
