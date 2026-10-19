@@ -76,6 +76,7 @@ def _item(row: ListedPatient, today: date, years: int) -> PatientListItem:
         first_name=p.first_name,
         last_name=p.last_name,
         mrn=p.mrn,
+        dob=p.dob,
         age=age_on(p.dob, today),
         status=PatientStatus(p.status),
         last_visit_at=p.last_visit_at,

@@ -1,8 +1,7 @@
 """Patient writes. Each one commits the change and its audit entry together, or neither."""
 
 import uuid
-from collections.abc import AsyncIterator, Mapping
-from contextlib import asynccontextmanager
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -12,6 +11,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.audit import Audit, AuditAction, AuditEntry
 from app.crypto import FieldCipher
 from app.db.models import CareTeamMember, Patient, User
+from app.db.unit_of_work import transaction
 from app.errors import (
     DuplicateMrnConflictError,
     InvalidStateError,
@@ -42,21 +42,11 @@ class PatientService:
         self._user = user
         self._audit = audit
 
-    @asynccontextmanager
-    async def _transaction(self) -> AsyncIterator[None]:
-        """Commit this write with its audit entry; on failure undo only this write.
-
-        A savepoint (not session.rollback()) keeps anything else in the session intact.
-        """
-        async with self._session.begin_nested():
-            yield
-        await self._session.commit()
-
     async def create(self, data: NewPatient, *, confirm_not_duplicate: bool) -> Patient:
         matches = await self._repo.find_likely_duplicates(data.last_name, data.dob)
         if matches and not confirm_not_duplicate:
             raise PossibleDuplicateError(matches=[str(m) for m in matches])
-        async with self._transaction():
+        async with transaction(self._session):
             try:
                 patient = await self._repo.create(data)
             except DuplicateMrnError:
@@ -124,7 +114,7 @@ class PatientService:
             return patient
         new_values = {name: new for name, (_, new) in diff.items()}
         try:
-            async with self._transaction():
+            async with transaction(self._session):
                 try:
                     await self._repo.update(patient.id, **new_values)
                 except DuplicateMrnError:

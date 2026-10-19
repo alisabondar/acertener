@@ -16,7 +16,7 @@ repos:
         pass_filenames: false
       - id: frontend-check
         name: frontend vp check (lint, format, types)
-        entry: bash -c 'cd frontend && vp check'
+        entry: bash -c 'cd frontend && bunx vp check'
         language: system
         files: ^frontend/
         pass_filenames: false

@@ -25,6 +25,7 @@ from app.patients.queries import (
     practice_today,
 )
 from app.schemas.patients import Order, QuickFilter, Scope, SearchTerms, Sort
+from app.visits.queries import build_todays_visits_statement
 
 AnySelect = Select[*tuple[Any, ...]]
 LARGE_TABLES = ("patients", "visits", "patient_name_prefixes", "care_team_members", "audit_log")
@@ -100,6 +101,8 @@ async def main() -> None:
                 "search: mrn": search(SearchTerms(mrn=sample.mrn)),
                 "filter counts: all": build_counts_statement(chen, Scope.ALL, today, tz),
                 "filter counts: my": build_counts_statement(chen, Scope.MY, today, tz),
+                "today's visits: my": build_todays_visits_statement(chen, Scope.MY, today, tz),
+                "today's visits: all": build_todays_visits_statement(chen, Scope.ALL, today, tz),
                 "detail": select(Patient).where(Patient.id == sample.id),
                 "access log": select(AuditLog, User)
                 .join(User, AuditLog.actor_id == User.id)

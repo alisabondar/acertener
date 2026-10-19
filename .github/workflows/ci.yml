@@ -65,10 +65,16 @@ jobs:
         run: uv run ruff format --check .
       - name: Type check
         run: uv run mypy
+      - name: Only the AI gateway makes outbound calls
+        run: uv run lint-imports
       - name: Test (with coverage gate)
         run: uv run pytest --cov
-      - name: Security modules need 100% branch coverage
-        run: uv run coverage report --include="app/crypto/*,app/auth/permissions.py" --fail-under=100
+      - name: Committed API contract (schema, role permissions) matches the API
+        run: |
+          uv run python -m scripts.export_openapi
+          git diff --exit-code -- ../frontend/src/api/openapi.json ../frontend/src/test/role-permissions.json
+      - name: Security and AI-privacy modules need 100% branch coverage
+        run: uv run coverage report --include="app/crypto/*,app/auth/permissions.py,app/ai/*" --fail-under=100
 
   frontend:
     runs-on: ubuntu-latest
@@ -82,6 +88,10 @@ jobs:
           bun-version: 1.4.3
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Generated API types match the committed schema
+        run: |
+          bun run api:generate
+          git diff --exit-code -- src/api/schema.d.ts
       - name: Lint, format, type check, test
         run: bun run check
       - name: Build

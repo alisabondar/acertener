@@ -91,5 +91,6 @@ class PatientSummary(Base):
     generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(Text)
+    generation_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (CheckConstraint(one_of("status", SUMMARY_STATUSES), name="status"),)

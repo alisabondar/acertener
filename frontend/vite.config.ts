@@ -1,11 +1,16 @@
+import { fileURLToPath } from "node:url";
+
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
 // https://vite.dev/config/
 export default defineConfig({
-  fmt: {},
+  // Written by the backend's export script; left exactly as exported.
+  fmt: { ignorePatterns: ["src/api/openapi.json", "src/test/role-permissions.json"] },
   lint: {
     plugins: ["react", "typescript", "oxc"],
+    ignorePatterns: ["src/api/schema.d.ts"],
     rules: {
       "react/rules-of-hooks": "error",
       "react/only-export-components": [
@@ -16,6 +21,13 @@ export default defineConfig({
       ],
       "vite-plus/prefer-vite-plus-imports": "error",
     },
+    // shadcn's generated components export variants beside components; we don't edit them.
+    overrides: [
+      {
+        files: ["src/components/ui/**", "src/hooks/use-mobile.ts"],
+        rules: { "react/only-export-components": "off", "react/set-state-in-effect": "off" },
+      },
+    ],
     options: {
       typeAware: true,
       typeCheck: true,
@@ -27,5 +39,14 @@ export default defineConfig({
       },
     ],
   },
-  plugins: lazyPlugins(() => [react()]),
+  plugins: lazyPlugins(() => [react(), tailwindcss()]),
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
+  // In development the browser calls /api on its own origin; Vite forwards it to FastAPI.
+  server: { proxy: { "/api": "http://127.0.0.1:8000" } },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+  },
 });

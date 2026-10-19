@@ -23,3 +23,7 @@ dist/
 # OS / editor
 .DS_Store
 .idea/
+
+# Lighthouse reports
+*.report.html
+*.report.json

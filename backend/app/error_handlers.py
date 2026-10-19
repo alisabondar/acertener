@@ -60,7 +60,7 @@ def register_error_handlers(app: FastAPI) -> None:
             exc.code.status,
             exc.code.name,
             exc.detail,
-            headers=exc.headers,
+            headers=exc.response_headers(),
             extensions=exc.extensions,
         )
 

@@ -64,6 +64,7 @@ async def test_list_returns_a_page_with_computed_fields(
     [item] = page["items"]
     assert item["id"] == str(patient.id)
     assert (item["last_name"], item["age"], item["status"]) == ("Smith", 40, "active")
+    assert item["dob"] == dob.isoformat()
     assert item["on_my_care_team"] is True
     assert item["inactivity_suggested"] is False
 

@@ -39,3 +39,5 @@ def configure_logging(level: str = "INFO") -> None:
     # httpx2 logs every request's full URL at INFO, which could include identifiers.
     for name in ("httpx2", "httpcore2"):
         logging.getLogger(name).setLevel(logging.WARNING)
+    # Presidio logs every recognizer it loads (and skips) on first use; only its errors matter.
+    logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)

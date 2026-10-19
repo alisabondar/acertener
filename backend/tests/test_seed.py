@@ -72,6 +72,21 @@ async def test_personas_are_seeded(db_session: AsyncSession, field_cipher: Field
 
 @pytest.mark.db
 @pytest.mark.anyio
+async def test_staff_keep_their_ids_across_reseeds(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    runs = []
+    for _ in range(2):
+        savepoint = await db_session.begin_nested()
+        await seed(db_session, field_cipher, count=SMALL, today=TODAY)
+        runs.append({u.email: u.id for u in await db_session.scalars(select(User))})
+        await savepoint.rollback()
+
+    assert runs[0] == runs[1]
+
+
+@pytest.mark.db
+@pytest.mark.anyio
 async def test_seeded_data_is_clinically_consistent(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
@@ -127,6 +142,30 @@ async def test_seeding_twice_adds_nothing(
 
     assert second.skipped
     assert await db_session.scalar(select(func.count()).select_from(Patient)) == SMALL
+
+
+@pytest.mark.db
+@pytest.mark.anyio
+async def test_seed_has_a_realistic_status_mix(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    count = 1000
+    await seed(db_session, field_cipher, count=count, today=TODAY)
+    patients = list(await db_session.scalars(select(Patient)))
+    three_years_ago = datetime.combine(TODAY.replace(year=TODAY.year - 3), time(), tzinfo=UTC)
+
+    def share(predicate: Any) -> float:
+        return sum(1 for p in patients if predicate(p)) / count
+
+    # The spec's mix: about 5% inactive, about 1% deceased, and a few long-unseen actives.
+    assert 0.003 <= share(lambda p: p.status == "deceased") <= 0.02
+    assert 0.03 <= share(lambda p: p.status == "inactive") <= 0.07
+    assert (
+        0.01 <= share(lambda p: p.status == "active" and p.last_visit_at < three_years_ago) <= 0.05
+    )
+    archived = [p for p in patients if p.archived_at is not None]
+    assert archived
+    assert all(p.status != "active" for p in archived)
 
 
 @pytest.mark.db

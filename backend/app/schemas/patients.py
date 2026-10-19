@@ -59,6 +59,7 @@ class PatientListItem(BaseModel):
     first_name: str
     last_name: str
     mrn: str
+    dob: date
     age: int
     status: PatientStatus
     last_visit_at: datetime | None

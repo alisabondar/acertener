@@ -25,6 +25,7 @@ class AuditAction(StrEnum):
     RESTORE = "restore"
     DELETE = "delete"
     ACCESS_DENIED = "access_denied"
+    LLM_PAYLOAD_BLOCKED = "llm_payload_blocked"
 
 
 @dataclass(frozen=True)

@@ -3,12 +3,12 @@
 A clinician-facing patient dashboard, built HIPAA-ready from day one. All data is synthetic.
 
 **Stack:** FastAPI · SQLAlchemy 2.0 (async) · PostgreSQL 16 · Alembic (backend, `uv`)
-· Vite+ · React · TypeScript (frontend, Bun)
+· Vite+ · React · TypeScript · TanStack Query · shadcn/ui (frontend, Bun)
 
 ## Quick start
 
 **Prerequisites:** Docker, [uv](https://docs.astral.sh/uv/), [Bun](https://bun.sh) ≥ 1.4.3,
-Vite+ (`bun add -g vite-plus`), `gitleaks`, and `pre-commit`.
+`gitleaks`, and `pre-commit`. Vite+ comes with the frontend's dependencies.
 
 ```bash
 cp .env.example .env                 # once
@@ -22,8 +22,19 @@ uv run python -m scripts.seed       # 10,000 synthetic patients and the demo per
 uv run uvicorn --factory app.main:create_app --reload
 ```
 
+In a second terminal:
+
+```bash
+cd frontend
+bun install
+bun run dev                          # http://localhost:5173; /api is proxied to the API on :8000
+```
+
+- App: http://localhost:5173. There's no login: it starts as **Dr. Chen**, and **Switch** in the
+  banner (or the avatar menu) changes who you're acting as. Navigation and pages follow the
+  persona's role; the API enforces every permission regardless.
 - API: http://localhost:8000 · Interactive docs: http://localhost:8000/docs
-- No login: `GET /api/v1/personas` lists the demo personas; send `X-Persona: <id>` to act as one
+- Calling the API directly: `GET /api/v1/personas` lists the demo personas; send `X-Persona: <id>` to act as one
   (in `/docs`, add the header per request). Every action is permission-checked and audited.
 - Health: `GET /health` (process is up) and `GET /health/ready` (database reachable, otherwise `503`)
 - Encryption keys are created in `.keys/` on first start. Patient identifiers and clinical free text
@@ -38,6 +49,8 @@ uv run uvicorn --factory app.main:create_app --reload
 | Backend tests without Docker | `cd backend && uv run pytest -m "not db"` |
 | Backend tests with the coverage gate (80%) | `cd backend && uv run pytest --cov` |
 | Frontend lint, format, types, tests | `cd frontend && bun run check` |
+| Frontend tests only | `cd frontend && bun run test` |
+| Regenerate API types after a backend schema change (CI fails if they're stale) | `cd frontend && bun run api:types` |
 | New migration | `cd backend && uv run alembic revision -m "describe change"` |
 | Seed the dev database (10,000 by default; `--count N`, `--reset` to start over) | `cd backend && uv run python -m scripts.seed` |
 | Performance checks (see [`docs/performance.md`](docs/performance.md)) | `cd backend && uv run python -m scripts.explain_queries` · `scripts.time_endpoints` (API running) |
@@ -59,4 +72,3 @@ All config comes from environment variables. See [`.env.example`](.env.example).
 | `POSTGRES_PORT` | Host port for Postgres. If you change it, update both URLs below. |
 | `DATABASE_URL` | API database (`postgresql+asyncpg://…`) |
 | `TEST_DATABASE_URL` | Test database (`app_test`, created automatically) |
-| `VITE_API_BASE_URL` | Frontend API prefix (browser-visible, so never put secrets in it) |
