@@ -122,16 +122,16 @@ async def test_duplicate_mrn_is_a_hard_409_on_create_and_edit(
     api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
     creator = await add_user(db_session)
-    holder = await create_patient(db_session, field_cipher, mrn="MRN-555")
-    other = await create_patient(db_session, field_cipher, mrn="MRN-556", last_name="Other")
+    holder = await create_patient(db_session, field_cipher, mrn="MRN-5555")
+    other = await create_patient(db_session, field_cipher, mrn="MRN-5556", last_name="Other")
 
-    created = await _create(api, creator, mrn=" mrn-555 ", confirm_not_duplicate=True)
-    edited = await _patch(api, creator, other.id, 1, mrn="MRN-555")
+    created = await _create(api, creator, mrn=" mrn-5555 ", confirm_not_duplicate=True)
+    edited = await _patch(api, creator, other.id, 1, mrn="MRN-5555")
 
     for response in (created, edited):
         assert response.status_code == 409
         assert response.json()["code"] == "DUPLICATE_MRN"
-        assert "555" not in response.json()["detail"]
+        assert "5555" not in response.json()["detail"]
         # Points at the patient who has the MRN, so the form can link to their chart.
         assert response.json()["matches"] == [str(holder.id)]
 

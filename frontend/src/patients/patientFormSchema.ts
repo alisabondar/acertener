@@ -55,7 +55,7 @@ export const patientSchema = z.object({
   mrn: z
     .string()
     .trim()
-    .refine((v) => MRN_DIGITS.test(v), "Enter the MRN's digits"),
+    .refine((v) => MRN_DIGITS.test(v), "Enter the MRN's 4 to 10 digits"),
   dob: z
     .string()
     .trim()

@@ -114,3 +114,9 @@ def test_registration_needs_the_critical_fields(missing: str) -> None:
 @pytest.mark.parametrize("typed", ["100234", "MRN-100234", " mrn-100234 "])
 def test_mrns_are_stored_in_one_format(typed: str) -> None:
     assert PatientFields.model_validate({**VALID, "mrn": typed}).mrn == "MRN-100234"
+
+
+@pytest.mark.parametrize("mrn", ["123", "MRN-123", "12345678901"])
+def test_mrns_are_four_to_ten_digits(mrn: str) -> None:
+    with pytest.raises(ValidationError, match="MRN"):
+        PatientFields.model_validate({**VALID, "mrn": mrn})

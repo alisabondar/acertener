@@ -133,7 +133,7 @@ BloodType = Literal["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
 # each part optionally ending in a period: "O'Neil", "Mary-Jane", "Nguyễn", "St. John",
 # "Smith Jr.". No digits or symbols.
 _NAME = re.compile(r"[^\W\d_]+\.?(?:[ '\u2019-][^\W\d_]+\.?)*")
-_MRN = re.compile(r"(?:MRN-)?(\d{1,12})", re.IGNORECASE)
+_MRN = re.compile(r"(?:MRN-)?(\d{4,10})", re.IGNORECASE)
 _EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
 _POSTAL_CODE = re.compile(r"\d{5}(?:-\d{4})?")
 _HAS_LETTER_OR_DIGIT = re.compile(r"[^\W_]")
@@ -214,7 +214,7 @@ def _check_mrn(value: str) -> str:
     """The practice's MRNs are numbers: accept "100234" or "MRN-100234", store "MRN-100234"."""
     match = _MRN.fullmatch(value)
     if not match:
-        raise ValueError("Enter the MRN's digits, e.g. 100234")
+        raise ValueError("Enter the MRN's 4 to 10 digits, e.g. 100234")
     return f"MRN-{match.group(1)}"
 
 

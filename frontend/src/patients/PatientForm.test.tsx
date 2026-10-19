@@ -64,7 +64,7 @@ describe("new patient", () => {
     for (const [label, message] of [
       ["Date of birth", "Enter a date of birth as YYYY-MM-DD, not in the future or before 1900"],
       ["Sex", "Choose the patient's sex"],
-      ["MRN", "Enter the MRN's digits"],
+      ["MRN", "Enter the MRN's 4 to 10 digits"],
       ["Phone", "Enter a phone number to reach the patient"],
     ]) {
       expect(screen.getByLabelText(label!)).toHaveAccessibleDescription(message!);
@@ -79,7 +79,9 @@ describe("new patient", () => {
     await user.type(await screen.findByLabelText("MRN"), "MRN-12");
     await user.click(screen.getByRole("button", { name: "Create patient" }));
 
-    expect(screen.getByLabelText("MRN")).toHaveAccessibleDescription("Enter the MRN's digits");
+    expect(screen.getByLabelText("MRN")).toHaveAccessibleDescription(
+      "Enter the MRN's 4 to 10 digits",
+    );
   });
 
   it("creates the patient with their medical details, then opens the chart", async () => {
