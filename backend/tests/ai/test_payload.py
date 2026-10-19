@@ -76,6 +76,7 @@ def test_cannot_be_built_except_by_the_de_identifier() -> None:
         )
 
 
+@pytest.mark.privacy
 def test_the_exact_outbound_payload_is_reviewed_in_code(ids: PatientIdentifiers) -> None:
     """Golden snapshot: any change to what's sent to the AI shows up as a diff in review."""
     payload = json.loads(build_context(ids, _records(), TODAY).model_dump_json())

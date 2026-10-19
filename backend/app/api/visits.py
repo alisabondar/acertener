@@ -3,12 +3,11 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import Audit, AuditAction, AuditEntry, get_audit
 from app.auth.permissions import Permission, has_permission, require
 from app.db.models import User
-from app.db.session import get_session
+from app.db.session import DbSession
 from app.demo.schedule import keep_schedule_current
 from app.patients.derived import age_on
 from app.patients.queries import practice_today
@@ -25,7 +24,7 @@ Scheduler = Annotated[User, Depends(require(Permission.SCHEDULE_VISITS))]
 async def today(
     request: Request,
     user: Scheduler,
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: DbSession,
     audit: Annotated[Audit, Depends(get_audit)],
     scope: Scope = Scope.MY,
 ) -> TodaysVisits:

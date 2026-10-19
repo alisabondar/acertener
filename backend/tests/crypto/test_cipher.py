@@ -67,6 +67,7 @@ def test_old_key_still_decrypts_after_rotation_and_new_values_use_the_new_key() 
         make_cipher(old_key).decrypt(new_token)
 
 
+@pytest.mark.privacy
 def test_decryption_error_never_reveals_ciphertext_or_plaintext() -> None:
     token = make_cipher().encrypt(CANARY)
 

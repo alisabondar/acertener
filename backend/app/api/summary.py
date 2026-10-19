@@ -14,7 +14,7 @@ from app.ai.summary import SummaryService, SummaryState, chart_inputs, generate
 from app.audit import Audit, AuditAction, AuditEntry, get_audit
 from app.auth.permissions import Permission, require
 from app.db.models import User
-from app.db.session import get_session
+from app.db.session import DbSession
 from app.errors import NotFoundError, RateLimitedError
 from app.patients.queries import practice_today
 from app.schemas.clinical import Severity
@@ -31,7 +31,6 @@ from app.schemas.summary import (
 router = APIRouter(tags=["summary"])
 
 Clinician = Annotated[User, Depends(require(Permission.VIEW_CLINICAL))]
-Session = Annotated[AsyncSession, Depends(get_session)]
 AuditDep = Annotated[Audit, Depends(get_audit)]
 
 # "Refresh now" is allowed once per this many seconds per patient.
@@ -86,7 +85,7 @@ async def get_summary(
     request: Request,
     patient_id: uuid.UUID,
     user: Clinician,
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
     gateway: GatewayDep,
     background: BackgroundTasks,
@@ -105,7 +104,7 @@ async def refresh_summary(
     response: Response,
     patient_id: uuid.UUID,
     user: Clinician,
-    session: Session,
+    session: DbSession,
     gateway: GatewayDep,
     background: BackgroundTasks,
 ) -> SummaryOut:
@@ -129,7 +128,7 @@ async def preview_payload(
     request: Request,
     patient_id: uuid.UUID,
     user: Clinician,
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
     gateway: GatewayDep,
 ) -> PayloadPreview:

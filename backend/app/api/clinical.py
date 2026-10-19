@@ -2,13 +2,12 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Response
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import Audit, AuditAction, get_audit
 from app.auth.permissions import Permission, require
 from app.clinical.service import ClinicalService
 from app.db.models import Allergy, Condition, Note, User, Vital
-from app.db.session import get_session
+from app.db.session import DbSession
 from app.schemas.clinical import (
     AllergyCreate,
     AllergyOut,
@@ -27,7 +26,6 @@ from app.schemas.clinical import (
 
 router = APIRouter(tags=["clinical"])
 
-Session = Annotated[AsyncSession, Depends(get_session)]
 AuditDep = Annotated[Audit, Depends(get_audit)]
 
 
@@ -35,7 +33,7 @@ def _service(permission: Permission) -> Any:
     """The clinical service for a user who holds `permission` (401, then 403, otherwise)."""
 
     async def dependency(
-        user: Annotated[User, Depends(require(permission))], session: Session, audit: AuditDep
+        user: Annotated[User, Depends(require(permission))], session: DbSession, audit: AuditDep
     ) -> ClinicalService:
         return ClinicalService(session, user, audit)
 

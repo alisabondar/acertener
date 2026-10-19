@@ -45,6 +45,7 @@ def test_request_is_logged_as_json_with_request_id(
     assert isinstance(entry["duration_ms"], float)
 
 
+@pytest.mark.privacy
 def test_query_string_never_reaches_logs(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:

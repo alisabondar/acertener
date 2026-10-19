@@ -54,7 +54,9 @@ export function MyDay() {
         <div>
           <h1 className="text-[28px] font-semibold">My day</h1>
           <p className="text-[15px] text-muted-foreground">
-            {greeting(now)}, {me.name} · {format(now, "EEEE, MMMM d")}
+            {greeting(now)}, {me.name}
+            {/* The practice's calendar day, which can differ from the browser's near midnight. */}
+            {day.data && ` · ${format(parseISO(day.data.date), "EEEE, MMMM d")}`}
           </p>
         </div>
         {careTeam && (

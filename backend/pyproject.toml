@@ -24,6 +24,7 @@ dev = [
     "httpx2>=2.13.1",
     "hypothesis>=6.170.1",
     "import-linter>=2.15",
+    "locust>=2.46.7",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
@@ -45,18 +46,23 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "S", "SIM", "RUF", "ASYNC", "PT"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+# Picks simulated users and patients; nothing security-related.
+"loadtest/**" = ["S311"]
 
 [tool.mypy]
 strict = true
 python_version = "3.12"
-files = ["app", "tests", "migrations", "scripts"]
+files = ["app", "tests", "migrations", "scripts", "loadtest"]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra --strict-markers"
-markers = ["db: needs the real test Postgres (deselect with -m 'not db')"]
+markers = [
+    "db: needs the real test Postgres (deselect with -m 'not db')",
+    "privacy: PHI canaries for data at rest, logs, error bodies and outbound AI (run with -m privacy)",
+]
 
 [tool.coverage.run]
 branch = true

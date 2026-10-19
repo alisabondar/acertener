@@ -20,6 +20,7 @@ def test_health_ready_checks_the_database(client: TestClient) -> None:
     assert response.json() == {"status": "ready"}
 
 
+@pytest.mark.privacy
 def test_health_ready_is_503_without_leaking_connection_details(settings: Settings) -> None:
     unreachable = "postgresql+asyncpg://canary_user:canary_pw@127.0.0.1:1/canary_db"
     settings = settings.model_copy(update={"database_url": unreachable})

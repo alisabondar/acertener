@@ -5,12 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import changed_fields
 from app.auth.permissions import Permission, require
 from app.db.models import AuditLog, User
-from app.db.session import get_session
+from app.db.session import DbSession
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -51,7 +50,7 @@ def _item(row: AuditLog) -> AuditItemOut:
 @router.get("/audit-log")
 async def audit_log(
     _: Annotated[User, Depends(require(Permission.VIEW_AUDIT_LOG))],
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: DbSession,
     patient_id: uuid.UUID | None = None,
     actor_id: uuid.UUID | None = None,
     before_id: int | None = None,

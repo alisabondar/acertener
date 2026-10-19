@@ -4,14 +4,13 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, Request
+from fastapi import BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.auth.identity import CurrentUser
 from app.db.models import AuditLog, User
-from app.db.session import get_session
+from app.db.session import DbSession
 
 logger = logging.getLogger("app.audit")
 
@@ -120,7 +119,7 @@ class Audit:
 async def get_audit(
     request: Request,
     user: CurrentUser,
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: DbSession,
     background: BackgroundTasks,
 ) -> Audit:
     return Audit(

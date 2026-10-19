@@ -21,6 +21,7 @@ class _BrokenSessionmaker:
 
 
 @pytest.mark.anyio
+@pytest.mark.privacy
 async def test_failed_background_write_is_logged_safely(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.ERROR, logger="app.audit")
     row = build_row(User(id=uuid.uuid4()), AuditEntry(AuditAction.VIEW, "patient"), "req-123")

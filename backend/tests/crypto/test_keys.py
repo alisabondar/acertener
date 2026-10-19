@@ -44,6 +44,7 @@ def test_field_keys_file_lists_newest_first_and_ignores_blank_lines(tmp_path: Pa
     assert keys.field_keys == [new_key, old_key]
 
 
+@pytest.mark.privacy
 def test_key_generation_is_logged_without_key_material(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

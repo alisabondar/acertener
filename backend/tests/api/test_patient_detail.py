@@ -82,6 +82,7 @@ async def test_viewing_a_patient_is_audited_for_that_patient(
     )
 
 
+@pytest.mark.privacy
 async def test_access_log_lists_this_patients_history_without_values(
     api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:

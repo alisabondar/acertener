@@ -7,7 +7,15 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 // https://vite.dev/config/
 export default defineConfig({
   // Written by the backend's export script; left exactly as exported.
-  fmt: { ignorePatterns: ["src/api/openapi.json", "src/test/role-permissions.json"] },
+  fmt: {
+    ignorePatterns: [
+      "src/api/openapi.json",
+      "src/test/role-permissions.json",
+      "test-results/**",
+      "playwright-report/**",
+      "coverage/**",
+    ],
+  },
   lint: {
     plugins: ["react", "typescript", "oxc"],
     ignorePatterns: ["src/api/schema.d.ts"],
@@ -48,5 +56,15 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Playwright runs the end-to-end specs against the real stack, not Vitest.
+    include: ["src/**/*.test.{ts,tsx}"],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      // Generated code, vendored shadcn primitives and test helpers aren't ours to cover.
+      exclude: ["src/api/schema.d.ts", "src/components/ui/**", "src/test/**", "src/**/*.test.*"],
+      // A little under today's numbers, so CI catches a drop without failing on noise.
+      thresholds: { statements: 88, branches: 78, functions: 84, lines: 88 },
+    },
   },
 });

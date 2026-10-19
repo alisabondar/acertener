@@ -106,9 +106,12 @@ describe("patient list", () => {
     const user = userEvent.setup();
     const page = (n: number) =>
       Array.from({ length: 20 }, (_, i) => makePatient({ last_name: `Page${n}-${i}` }));
+    // Page 2 (also requested by the prefetch) waits until the test lets it through.
+    let releasePageTwo = () => {};
+    const pageTwoReleased = new Promise<void>((resolve) => (releasePageTwo = resolve));
     listReturns(async (url) => {
       const n = Number(url.searchParams.get("page") ?? 1);
-      if (n === 2) await delay(150);
+      if (n === 2) await pageTwoReleased;
       return HttpResponse.json(makePage(page(n), { total: 45, page: n }));
     });
     renderApp("/patients");
@@ -117,6 +120,7 @@ describe("patient list", () => {
     await user.click(screen.getByRole("button", { name: "Next page" }));
 
     expect(screen.getByText(/Page1-0/)).toBeInTheDocument();
+    releasePageTwo();
     expect(await screen.findByText(/Page2-0/)).toBeInTheDocument();
     expect(screen.getByText("21–40 of 45")).toBeInTheDocument();
   });

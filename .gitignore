@@ -27,3 +27,12 @@ dist/
 # Lighthouse reports
 *.report.html
 *.report.json
+
+# Test output
+frontend/test-results/
+frontend/playwright-report/
+frontend/coverage/
+backend/loadtest/results/
+
+# Planning and write-ups stay local; anything reviewer-facing goes in the README
+docs/

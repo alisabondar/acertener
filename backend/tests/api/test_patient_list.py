@@ -171,6 +171,7 @@ async def test_pagination(
     assert (second["total"], len(second["items"])) == (5, 2)
 
 
+@pytest.mark.privacy
 async def test_search_combines_name_prefix_dob_and_filters_without_leaking_terms(
     api: httpx2.AsyncClient,
     db_session: AsyncSession,

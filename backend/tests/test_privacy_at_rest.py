@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, date, datetime
 
 import pytest
@@ -10,7 +11,7 @@ from app.patients.repository import NewPatient, PatientRepository
 from scripts.prove_encryption import database_as_text
 from tests.factories import make_audit, make_user
 
-pytestmark = [pytest.mark.db, pytest.mark.anyio]
+pytestmark = [pytest.mark.privacy, pytest.mark.anyio]
 
 CANARY = NewPatient(
     first_name="Quillonfirst",
@@ -35,6 +36,31 @@ SUMMARY_CONTENT = "Zyxcanary is a 94-year-old patient at Canarywood Lane"
 CANARY_VALUES += [VISIT_REASON, NOTE_CONTENT, SUMMARY_CONTENT]
 
 
+def leaked(dump: str, values: list[str]) -> list[str]:
+    """Values found in the dump as whole tokens, in plain text or hex.
+
+    Whole tokens only: a short value like a ZIP code would otherwise match by chance inside a
+    random UUID or a timestamp's microseconds.
+    """
+    dump = dump.casefold()
+    return [
+        v
+        for v in values
+        if any(
+            re.search(rf"(?<![0-9a-z]){re.escape(form)}(?![0-9a-z])", dump)
+            for form in (v.casefold(), v.encode().hex())
+        )
+    ]
+
+
+def test_a_value_inside_a_random_identifier_is_not_a_leak() -> None:
+    dump = "id=3f2c4a90717e4b1d created=2026-10-18 09:12:44.907171"
+
+    assert leaked(dump, ["90717"]) == []
+    assert leaked(dump + " zip=90717", ["90717"]) == ["90717"]
+
+
+@pytest.mark.db
 async def test_no_plaintext_phi_at_rest(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
@@ -73,7 +99,4 @@ async def test_no_plaintext_phi_at_rest(
     )
     await db_session.flush()
 
-    dump = (await database_as_text(db_session)).casefold()
-
-    leaked = [v for v in CANARY_VALUES if v.casefold() in dump or v.encode().hex() in dump]
-    assert leaked == []
+    assert leaked(await database_as_text(db_session), CANARY_VALUES) == []

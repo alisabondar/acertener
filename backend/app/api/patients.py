@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit import Audit, AuditAction, AuditEntry, changed_fields, get_audit
 from app.auth.permissions import Permission, require
 from app.db.models import AuditLog, Patient, User
-from app.db.session import get_session
+from app.db.session import DbSession
 from app.db.types import get_field_cipher
 from app.errors import PatientNotFoundError, VersionConflictError
 from app.patients.derived import age_on, inactivity_suggested
@@ -48,7 +48,6 @@ from app.schemas.patients import (
 router = APIRouter(prefix="/patients", tags=["patients"])
 
 Viewer = Annotated[User, Depends(require(Permission.VIEW_DEMOGRAPHICS))]
-Session = Annotated[AsyncSession, Depends(get_session)]
 AuditDep = Annotated[Audit, Depends(get_audit)]
 
 
@@ -107,7 +106,7 @@ async def _page(
 
 @router.get("")
 async def browse(
-    request: Request, user: Viewer, session: Session, audit: AuditDep, params: Params
+    request: Request, user: Viewer, session: DbSession, audit: AuditDep, params: Params
 ) -> PatientPage:
     page = await _page(request, session, user, params, terms=None)
     audit.record_read(AuditEntry(AuditAction.VIEW, "patient_list"))
@@ -118,7 +117,7 @@ async def browse(
 async def search(
     request: Request,
     user: Viewer,
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
     params: Params,
     terms: SearchTerms,
@@ -131,7 +130,7 @@ async def search(
 
 @router.get("/filter-counts")
 async def filter_counts(
-    request: Request, user: Viewer, session: Session, audit: AuditDep, scope: Scope = Scope.MY
+    request: Request, user: Viewer, session: DbSession, audit: AuditDep, scope: Scope = Scope.MY
 ) -> FilterCountsOut:
     """Counts for the list's quick-filter chips."""
     tz = ZoneInfo(request.app.state.settings.practice_timezone)
@@ -184,7 +183,7 @@ async def _detail_out(
 
 @router.get("/{patient_id:uuid}")
 async def detail(
-    request: Request, patient_id: uuid.UUID, user: Viewer, session: Session, audit: AuditDep
+    request: Request, patient_id: uuid.UUID, user: Viewer, session: DbSession, audit: AuditDep
 ) -> PatientDetail:
     patient = await _get_patient(session, patient_id)
     audit.record_read(AuditEntry(AuditAction.VIEW, "patient", patient.id, patient.id))
@@ -196,7 +195,7 @@ async def create(
     request: Request,
     body: PatientCreate,
     user: Annotated[User, Depends(require(Permission.CREATE_PATIENT))],
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
 ) -> PatientDetail:
     data = NewPatient(**body.model_dump(exclude={"confirm_not_duplicate"}))
@@ -211,7 +210,7 @@ async def update(
     patient_id: uuid.UUID,
     body: PatientUpdate,
     user: Annotated[User, Depends(require(Permission.EDIT_DEMOGRAPHICS))],
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
 ) -> PatientDetail:
     """Applies only the fields sent. A stale base_version returns 409 with the current record."""
@@ -246,7 +245,7 @@ async def change_status(
     patient_id: uuid.UUID,
     body: StatusChange,
     user: StatusChanger,
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
 ) -> PatientDetail:
     service = PatientService(session, get_field_cipher(), user, audit)
@@ -262,7 +261,7 @@ async def archive(
     patient_id: uuid.UUID,
     body: ArchiveRequest,
     user: Archiver,
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
 ) -> PatientDetail:
     """Hides the record from lists and search; it stays viewable by id. Nothing is deleted."""
@@ -279,7 +278,7 @@ async def restore(
     patient_id: uuid.UUID,
     body: RestoreRequest,
     user: Archiver,
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
 ) -> PatientDetail:
     service = PatientService(session, get_field_cipher(), user, audit)
@@ -291,7 +290,7 @@ async def restore(
 async def access_log(
     patient_id: uuid.UUID,
     _: Annotated[User, Depends(require(Permission.VIEW_PATIENT_ACCESS_LOG))],
-    session: Session,
+    session: DbSession,
     audit: AuditDep,
     before_id: int | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,

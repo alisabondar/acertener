@@ -2,10 +2,9 @@ import uuid
 from typing import Annotated
 
 from fastapi import Depends, Header, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
-from app.db.session import get_session
+from app.db.session import DbSession
 from app.errors import NotAuthenticatedError
 
 PERSONA_HEADER = "X-Persona"
@@ -18,7 +17,7 @@ def require_demo_mode(request: Request) -> None:
 
 async def current_user(
     request: Request,
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: DbSession,
     persona: Annotated[str | None, Header(alias=PERSONA_HEADER)] = None,
 ) -> User:
     """The only place identity is decided. In the MVP it's the demo persona from X-Persona;

@@ -117,6 +117,7 @@ def test_unregistered_http_status_uses_the_status_name_and_hides_detail(
     assert CANARY not in response.text
 
 
+@pytest.mark.privacy
 def test_unhandled_error_is_generic_500_and_logged_without_leaking(
     error_client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:

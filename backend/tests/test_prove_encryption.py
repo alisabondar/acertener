@@ -8,6 +8,7 @@ from scripts.prove_encryption import database_as_text, pg_dump_command, run_proo
 
 @pytest.mark.db
 @pytest.mark.anyio
+@pytest.mark.privacy
 async def test_proof_shows_plaintext_in_the_app_and_only_ciphertext_in_the_database(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:

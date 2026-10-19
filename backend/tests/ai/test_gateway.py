@@ -54,6 +54,7 @@ def _reply(narrative: str) -> httpx2.Response:
     return httpx2.Response(200, json={"candidates": [{"content": {"parts": [{"text": text}]}}]})
 
 
+@pytest.mark.privacy
 async def test_canary_no_identifier_leaves_in_any_outbound_byte(ids: PatientIdentifiers) -> None:
     sent: list[httpx2.Request] = []
 
@@ -277,6 +278,7 @@ async def test_a_token_bucket_spaces_out_provider_calls(ids: PatientIdentifiers)
     ]
 
 
+@pytest.mark.privacy
 async def test_logs_why_the_provider_refused_without_its_message(
     ids: PatientIdentifiers, caplog: pytest.LogCaptureFixture
 ) -> None:

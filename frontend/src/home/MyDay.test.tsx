@@ -99,6 +99,17 @@ describe("My day", () => {
     expect(router.state.location.pathname).toBe(`/patients/${visit.patient.id}`);
   });
 
+  it("dates the page by the practice's calendar day, not the browser's", async () => {
+    server.use(
+      http.get("/api/v1/visits/today", () =>
+        HttpResponse.json({ ...makeDay([]), date: "2026-10-19" }),
+      ),
+    );
+    renderApp("/");
+
+    expect(await screen.findByText(/Monday, October 19/)).toBeInTheDocument();
+  });
+
   it("says so when nothing is scheduled", async () => {
     dayIs([]);
     renderApp("/");
