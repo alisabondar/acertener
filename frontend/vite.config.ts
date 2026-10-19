@@ -51,8 +51,9 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
-  // In development the browser calls /api on its own origin; Vite forwards it to FastAPI.
-  server: { proxy: { "/api": "http://127.0.0.1:8000" } },
+  // In development the browser calls /api on its own origin; Vite forwards it to FastAPI
+  // (at api:8000 inside Docker Compose).
+  server: { proxy: { "/api": process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8000" } },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],

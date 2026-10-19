@@ -4,12 +4,12 @@ Run from backend/ with the dev database up:  uv run python -m scripts.prove_encr
 """
 
 import asyncio
+import os
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
 
 from cryptography.fernet import Fernet
 from sqlalchemy import column, literal_column, select, table, text
@@ -22,7 +22,6 @@ from app.db import create_engine
 from app.db.types import set_field_cipher
 from app.patients.repository import NewPatient, PatientRepository
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 SHOWN_COLUMNS = ("first_name", "last_name", "mrn", "dob")
 
 
@@ -95,26 +94,30 @@ async def run_proof(
         await session.commit()
 
 
-def pg_dump_command(database_url: str) -> list[str]:
-    """Dump exactly the database the app wrote to, using the user and name from its URL."""
+def pg_dump_command(database_url: str) -> tuple[list[str], dict[str, str]]:
+    """Dump exactly the database the app wrote to, using the host, user, and name from its URL.
+
+    The password goes in PGPASSWORD rather than the arguments, which any local user can list.
+    """
     url = make_url(database_url)
-    return [
-        "docker",
-        "compose",
-        "exec",
-        "-T",
-        "db",
+    command = [
         "pg_dump",
+        "-h",
+        str(url.host),
+        "-p",
+        str(url.port or 5432),
         "-U",
         str(url.username),
         str(url.database),
     ]
+    return command, {**os.environ, "PGPASSWORD": str(url.password or "")}
 
 
 async def _pg_dump(database_url: str) -> str:
-    # Fixed argument list and no shell; `docker` is resolved from PATH on purpose.
+    # Fixed argument list and no shell; `pg_dump` is resolved from PATH on purpose.
+    command, env = pg_dump_command(database_url)
     process = await asyncio.create_subprocess_exec(
-        *pg_dump_command(database_url), cwd=REPO_ROOT, stdout=asyncio.subprocess.PIPE
+        *command, env=env, stdout=asyncio.subprocess.PIPE
     )
     stdout, _ = await process.communicate()
     if process.returncode != 0:

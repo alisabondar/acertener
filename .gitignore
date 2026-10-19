@@ -34,5 +34,8 @@ frontend/playwright-report/
 frontend/coverage/
 backend/loadtest/results/
 
-# Planning and write-ups stay local; anything reviewer-facing goes in the README
-docs/
+# Working files for building the app (the spec, task list, and agent skill)
+docs/spec.md
+docs/build-plan.md
+docs/audit-loop.md
+docs/loadtest/

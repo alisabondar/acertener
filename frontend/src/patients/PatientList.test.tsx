@@ -205,7 +205,8 @@ describe("quick filters", () => {
 });
 
 describe("search", () => {
-  function searchReturns(items: PatientListItem[], wait = 0) {
+  /** `wait: "infinite"` keeps each search open until it's aborted, whatever the machine's speed. */
+  function searchReturns(items: PatientListItem[], wait?: "infinite") {
     const bodies: unknown[] = [];
     const signals: AbortSignal[] = [];
     server.use(
@@ -280,7 +281,7 @@ describe("search", () => {
 
   it("aborts a search that's overtaken by newer typing", async () => {
     const user = userEvent.setup();
-    const { bodies, signals } = searchReturns([makePatient()], 1000);
+    const { bodies, signals } = searchReturns([makePatient()], "infinite");
     renderApp("/patients");
     const box = await screen.findByRole("searchbox", { name: "Search patients" });
 
