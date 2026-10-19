@@ -147,6 +147,20 @@ describe("patient list", () => {
   });
 });
 
+describe("scope", () => {
+  it("switches between my patients and everyone with a single-choice toggle", async () => {
+    const user = userEvent.setup();
+    const { router } = renderApp("/patients");
+    const scope = await screen.findByRole("radiogroup", { name: "Whose patients" });
+    expect(within(scope).getByRole("radio", { name: "My patients" })).toBeChecked();
+
+    await user.click(within(scope).getByRole("radio", { name: "All patients" }));
+
+    expect(router.state.location.search).toBe("?scope=all");
+    expect(within(scope).getByRole("radio", { name: "All patients" })).toBeChecked();
+  });
+});
+
 describe("quick filters", () => {
   it("shows counts and filters the list by status", async () => {
     const user = userEvent.setup();
@@ -182,7 +196,7 @@ describe("quick filters", () => {
     expect(!!within(filters).queryByRole("button", { name: /Today's visits/ })).toBe(
       expected.today,
     );
-    expect(!!screen.queryByRole("tab", { name: "My patients" })).toBe(expected.myTab);
+    expect(!!screen.queryByRole("radio", { name: "My patients" })).toBe(expected.myTab);
   });
 });
 

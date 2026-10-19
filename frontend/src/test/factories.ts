@@ -88,6 +88,38 @@ export function makeCounts(
   };
 }
 
+export type ScheduledVisit = Schemas["ScheduledVisitOut"];
+
+let visitSeq = 0;
+
+/** A visit `minutesFromNow` from the current time (negative for earlier today). */
+export function makeVisit(
+  minutesFromNow: number,
+  overrides: Partial<ScheduledVisit> = {},
+): ScheduledVisit {
+  visitSeq += 1;
+  return {
+    id: `22222222-2222-4222-8222-${String(visitSeq).padStart(12, "0")}`,
+    scheduled_at: new Date(Date.now() + minutesFromNow * 60_000).toISOString(),
+    status: "scheduled",
+    provider_name: "Dr. Wei Chen",
+    reason: "Follow-up",
+    patient: {
+      id: `33333333-3333-4333-8333-${String(visitSeq).padStart(12, "0")}`,
+      first_name: "Daniel",
+      last_name: `Patient${visitSeq}`,
+      dob: "1963-04-02",
+      age: 63,
+      mrn: `MRN-${200000 + visitSeq}`,
+    },
+    ...overrides,
+  };
+}
+
+export function makeDay(items: ScheduledVisit[]): Schemas["TodaysVisits"] {
+  return { date: new Date().toISOString().slice(0, 10), items };
+}
+
 export function makeProblem(
   status: number,
   code: string,

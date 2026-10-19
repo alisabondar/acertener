@@ -157,10 +157,11 @@ async def test_seed_has_a_realistic_status_mix(
     def share(predicate: Any) -> float:
         return sum(1 for p in patients if predicate(p)) / count
 
-    assert 0.01 <= share(lambda p: p.status == "deceased") <= 0.06
-    assert 0.08 <= share(lambda p: p.status == "inactive") <= 0.18
+    # The spec's mix: about 5% inactive, about 1% deceased, and a few long-unseen actives.
+    assert 0.003 <= share(lambda p: p.status == "deceased") <= 0.02
+    assert 0.03 <= share(lambda p: p.status == "inactive") <= 0.07
     assert (
-        0.02 <= share(lambda p: p.status == "active" and p.last_visit_at < three_years_ago) <= 0.09
+        0.01 <= share(lambda p: p.status == "active" and p.last_visit_at < three_years_ago) <= 0.05
     )
     archived = [p for p in patients if p.archived_at is not None]
     assert archived

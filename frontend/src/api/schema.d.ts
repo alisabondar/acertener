@@ -214,6 +214,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/visits/today": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Today
+     * @description Today's schedule at the practice, for the "My day" home page.
+     */
+    get: operations["today_api_v1_visits_today_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/health": {
     parameters: {
       query?: never;
@@ -564,6 +584,29 @@ export interface components {
       /** Base Version */
       base_version: number;
     };
+    /** ScheduledVisitOut */
+    ScheduledVisitOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      patient: components["schemas"]["VisitPatient"];
+      /** Provider Name */
+      provider_name: string;
+      /** Reason */
+      reason: string | null;
+      /**
+       * Scheduled At
+       * Format: date-time
+       */
+      scheduled_at: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "scheduled" | "checked_in" | "completed" | "no_show" | "cancelled";
+    };
     /**
      * Scope
      * @enum {string}
@@ -594,6 +637,16 @@ export interface components {
       base_version: number;
       status: components["schemas"]["PatientStatus"];
     };
+    /** TodaysVisits */
+    TodaysVisits: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Items */
+      items: components["schemas"]["ScheduledVisitOut"][];
+    };
     /** UserOut */
     UserOut: {
       /** Credential */
@@ -620,6 +673,27 @@ export interface components {
       msg: string;
       /** Error Type */
       type: string;
+    };
+    /** VisitPatient */
+    VisitPatient: {
+      /** Age */
+      age: number;
+      /**
+       * Dob
+       * Format: date
+       */
+      dob: string;
+      /** First Name */
+      first_name: string;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Last Name */
+      last_name: string;
+      /** Mrn */
+      mrn: string;
     };
   };
   responses: never;
@@ -1082,6 +1156,39 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["UserOut"][];
+        };
+      };
+    };
+  };
+  today_api_v1_visits_today_get: {
+    parameters: {
+      query?: {
+        scope?: components["schemas"]["Scope"];
+      };
+      header?: {
+        "X-Persona"?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TodaysVisits"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

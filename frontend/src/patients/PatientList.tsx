@@ -1,24 +1,21 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, Search, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import { api } from "@/api";
 import { apiQueryFn, queryKeys, useApiQuery } from "@/api/queries";
 import { useCurrentUser } from "@/auth/context";
 import { hasCareTeam } from "@/auth/roles";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 import { EmptyState, ListError } from "./ListStates";
 import { patientListQuery } from "./patientListQuery";
 import { PatientTable, PatientTableSkeleton } from "./PatientTable";
+import { PatientSearchFields } from "./PatientSearchFields";
 import { QuickFilters } from "./QuickFilters";
-import { dobProblem, parseSearch } from "./searchTerms";
+import { ScopeToggle } from "./ScopeToggle";
 import { usePatientListParams } from "./usePatientListParams";
+import { usePatientSearch } from "./usePatientSearch";
 
-const SEARCH_DEBOUNCE_MS = 300;
 /** How long a prefetched next page counts as fresh, so revisits don't refetch it at once. */
 const PREFETCH_FRESH_MS = 30_000;
 
@@ -32,39 +29,13 @@ export function PatientList() {
     [careTeam, urlParams],
   );
 
-  // Search terms identify patients, so they stay in component state: never in the URL.
-  const [text, setText] = useState("");
-  const [dob, setDob] = useState("");
-  const [dobIncomplete, setDobIncomplete] = useState(false);
-  const ids = useId();
-  const dobNote = dobProblem(dob, dobIncomplete);
-  // A DOB with a problem isn't searched; its field explains why.
-  const searchableDob = dobNote ? "" : dob;
-  const { hint } = parseSearch(text, searchableDob);
-  // Typing is debounced; emptying a field applies at once, so a cleared search clears now.
-  const debouncedText = useDebouncedValue(text, text ? SEARCH_DEBOUNCE_MS : 0);
-  const debouncedDob = useDebouncedValue(searchableDob, searchableDob ? SEARCH_DEBOUNCE_MS : 0);
-  const { terms } = useMemo(
-    () => parseSearch(debouncedText, debouncedDob),
-    [debouncedText, debouncedDob],
-  );
-  // New search terms mean a new result set, so start it from the first page.
-  const editSearch = (update: () => void) => {
-    update();
-    if (params.page !== 1) setParams({ page: 1 });
-  };
-  const searchInput = useRef<HTMLInputElement>(null);
-  const dobInput = useRef<HTMLInputElement>(null);
-  const clearDob = () => {
-    setDob("");
-    setDobIncomplete(false);
-    // A half-typed date is already "" to React, so clear what the browser is showing directly.
-    if (dobInput.current) dobInput.current.value = "";
-  };
-  const clearSearch = () => {
-    setText("");
-    clearDob();
-  };
+  // A new search means a new result set, so start it from the first page.
+  const search = usePatientSearch({
+    onEdit: () => {
+      if (params.page !== 1) setParams({ page: 1 });
+    },
+  });
+  const { terms } = search;
 
   const { queryKey, call } = patientListQuery(params, terms);
   const list = useApiQuery(queryKey, call, { keepPrevious: true });
@@ -97,91 +68,18 @@ export function PatientList() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-[28px] font-semibold">Patients</h1>
         {careTeam && (
-          <Tabs
+          <ScopeToggle
             value={params.scope}
-            onValueChange={(scope) => {
-              if (scope === "my" || scope === "all") setParams({ scope });
-            }}
-          >
-            <TabsList>
-              <TabsTrigger value="my">My patients</TabsTrigger>
-              <TabsTrigger value="all">All patients</TabsTrigger>
-            </TabsList>
-          </Tabs>
+            onChange={(scope) => setParams({ scope })}
+            label="Whose patients"
+            myLabel="My patients"
+            allLabel="All patients"
+          />
         )}
       </div>
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="min-w-72 flex-1">
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                type="search"
-                aria-label="Search patients"
-                aria-describedby={hint ? `${ids}-search` : undefined}
-                aria-invalid={hint !== null}
-                placeholder="Last name, “last, first”, or MRN"
-                value={text}
-                onChange={(event) => editSearch(() => setText(event.target.value))}
-                autoComplete="off"
-                ref={searchInput}
-                // One clear control: ours, not the browser's built-in search ×.
-                className="bg-card pr-9 pl-9 [&::-webkit-search-cancel-button]:appearance-none"
-              />
-              {text && (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Clear search text"
-                  onClick={() => {
-                    editSearch(() => setText(""));
-                    searchInput.current?.focus();
-                  }}
-                  className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
-                >
-                  <X />
-                </Button>
-              )}
-            </div>
-            {hint && <FieldNote id={`${ids}-search`} problem={hint} />}
-          </div>
-          <div>
-            <div className="flex items-center gap-1">
-              <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                Date of birth
-                <Input
-                  ref={dobInput}
-                  type="date"
-                  aria-describedby={dobNote ? `${ids}-dob` : undefined}
-                  aria-invalid={dobNote !== null}
-                  value={dob}
-                  onChange={(event) => editSearch(() => setDob(event.target.value))}
-                  // A half-typed date reads as "" with badInput set; say so rather than ignore it.
-                  onInput={(event) => setDobIncomplete(event.currentTarget.validity.badInput)}
-                  className="w-40 bg-card"
-                />
-              </label>
-              {(dob || dobIncomplete) && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Clear date of birth"
-                  onClick={() => {
-                    editSearch(clearDob);
-                    dobInput.current?.focus();
-                  }}
-                >
-                  <X />
-                </Button>
-              )}
-            </div>
-            {dobNote && <FieldNote id={`${ids}-dob`} problem={dobNote} />}
-          </div>
-        </div>
+        <PatientSearchFields search={search} />
         <QuickFilters params={params} setParams={setParams} counts={counts.data} />
       </div>
 
@@ -211,7 +109,7 @@ export function PatientList() {
                 }
               : { message: "No patients match your search" })}
             action="Clear search"
-            onAction={clearSearch}
+            onAction={search.clear}
           />
         ) : filtered ? (
           <EmptyState
@@ -274,15 +172,5 @@ function Pagination({
         </Button>
       </div>
     </nav>
-  );
-}
-
-/** A problem with a field's value, shown under it and announced as its description. */
-function FieldNote({ id, problem }: { id: string; problem: string }) {
-  return (
-    <p id={id} className="mt-1.5 flex items-center gap-1.5 text-[12px] text-status-inactive">
-      <CircleAlert className="size-3.5 shrink-0" aria-hidden />
-      {problem}
-    </p>
   );
 }

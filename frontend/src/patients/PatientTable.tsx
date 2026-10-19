@@ -1,5 +1,6 @@
-import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
+import { formatDistanceToNowStrict } from "date-fns";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { memo } from "react";
 import { useNavigate } from "react-router";
 
 import type { components } from "@/api/schema";
@@ -12,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDob } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { StatusPill } from "./StatusPill";
@@ -20,7 +22,8 @@ import type { PatientListParams } from "./usePatientListParams";
 type Patient = components["schemas"]["PatientListItem"];
 type Sort = PatientListParams["sort"];
 
-export function PatientTable({
+/** Memoized: typing in the search box re-renders the page, but the rows only change with results. */
+export const PatientTable = memo(function PatientTable({
   patients,
   params,
   setParams,
@@ -93,8 +96,7 @@ export function PatientTable({
                 <div className="text-[12px] text-muted-foreground tabular-nums">{patient.mrn}</div>
               </TableCell>
               <TableCell className="tabular-nums">
-                {/* parseISO reads the date as local, so it never shifts a day across time zones. */}
-                {format(parseISO(patient.dob), "MM/dd/yyyy")}{" "}
+                {formatDob(patient.dob)}{" "}
                 <span className="text-muted-foreground">({patient.age}y)</span>
               </TableCell>
               <TableCell>
@@ -114,7 +116,7 @@ export function PatientTable({
       </Table>
     </div>
   );
-}
+});
 
 export function PatientTableSkeleton() {
   return (

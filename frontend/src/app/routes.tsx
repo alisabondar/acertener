@@ -3,11 +3,11 @@ import type { RouteObject } from "react-router";
 import { CurrentUserProvider } from "@/auth/CurrentUserProvider";
 import { RequirePermission } from "@/auth/RequirePermission";
 import { Home } from "@/pages/Home";
-import { PatientList } from "@/patients/PatientList";
 import { NotFound } from "@/pages/NotFound";
 import { Placeholder } from "@/pages/Placeholder";
 import { RouteError } from "@/pages/RouteError";
 
+import { PatientList } from "./lazyPages";
 import { Shell } from "./Shell";
 
 export const appRoutes: RouteObject[] = [

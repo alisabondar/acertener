@@ -1,4 +1,5 @@
 import { CalendarDays, LoaderCircle, ScrollText, UserPlus, Users } from "lucide-react";
+import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { type Permission, useCurrentUser } from "@/auth/context";
@@ -113,7 +114,9 @@ export function Shell() {
                 personaName={switchingTo.name}
               />
             ) : (
-              <Outlet />
+              <Suspense fallback={<PageLoading />}>
+                <Outlet />
+              </Suspense>
             )}
           </div>
         </SidebarInset>
@@ -134,6 +137,15 @@ function SwitchingPersona({ message, personaName }: { message: string; personaNa
       <p className="text-[15px] font-medium">
         {message} <span className="text-muted-foreground">as {personaName}</span>
       </p>
+    </div>
+  );
+}
+
+/** While a page's code downloads on first visit. */
+function PageLoading() {
+  return (
+    <div role="status" aria-label="Loading page" className="flex justify-center py-24">
+      <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden />
     </div>
   );
 }

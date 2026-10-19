@@ -54,10 +54,21 @@ async def add_to_care_team(
 
 
 async def add_visit(
-    session: AsyncSession, patient: Patient, provider: User, when: datetime, status: str
+    session: AsyncSession,
+    patient: Patient,
+    provider: User,
+    when: datetime,
+    status: str,
+    reason: str | None = None,
 ) -> None:
     session.add(
-        Visit(patient_id=patient.id, provider_id=provider.id, scheduled_at=when, status=status)
+        Visit(
+            patient_id=patient.id,
+            provider_id=provider.id,
+            scheduled_at=when,
+            status=status,
+            reason=reason,
+        )
     )
     await session.flush()
 

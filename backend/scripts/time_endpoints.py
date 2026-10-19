@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable
 import httpx2
 
 # Spec targets (p95, ms) at 10k patients.
-TARGETS = {"list": 200, "search": 200, "counts": 150, "detail": 150}
+TARGETS = {"list": 200, "search": 200, "counts": 150, "detail": 150, "schedule": 200}
 
 
 async def _time(n: int, call: Callable[[], Awaitable[httpx2.Response]]) -> list[float]:
@@ -84,6 +84,16 @@ async def main() -> None:
                 lambda: client.get("/patients/filter-counts", params={"scope": "my"}),
             ),
             ("detail", "detail", lambda: client.get(f"/patients/{first['id']}")),
+            (
+                "today's visits: my",
+                "schedule",
+                lambda: client.get("/visits/today", params={"scope": "my"}),
+            ),
+            (
+                "today's visits: all",
+                "schedule",
+                lambda: client.get("/visits/today", params={"scope": "all"}),
+            ),
         ]
         for name, kind, call in cases:
             await call()  # warm up

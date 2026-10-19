@@ -960,6 +960,59 @@
         "title": "RestoreRequest",
         "type": "object"
       },
+      "ScheduledVisitOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "patient": {
+            "$ref": "#/components/schemas/VisitPatient"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "scheduled_at": {
+            "format": "date-time",
+            "title": "Scheduled At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "scheduled",
+              "checked_in",
+              "completed",
+              "no_show",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "scheduled_at",
+          "status",
+          "provider_name",
+          "reason",
+          "patient"
+        ],
+        "title": "ScheduledVisitOut",
+        "type": "object"
+      },
       "Scope": {
         "enum": [
           "my",
@@ -1045,6 +1098,28 @@
         "title": "StatusChange",
         "type": "object"
       },
+      "TodaysVisits": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduledVisitOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "items"
+        ],
+        "title": "TodaysVisits",
+        "type": "object"
+      },
       "UserOut": {
         "properties": {
           "credential": {
@@ -1119,6 +1194,46 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VisitPatient": {
+        "properties": {
+          "age": {
+            "title": "Age",
+            "type": "integer"
+          },
+          "dob": {
+            "format": "date",
+            "title": "Dob",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "mrn": {
+            "title": "Mrn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "first_name",
+          "last_name",
+          "dob",
+          "age",
+          "mrn"
+        ],
+        "title": "VisitPatient",
         "type": "object"
       }
     }
@@ -2145,6 +2260,65 @@
         "summary": "Personas",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/visits/today": {
+      "get": {
+        "description": "Today's schedule at the practice, for the \"My day\" home page.",
+        "operationId": "today_api_v1_visits_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Scope",
+              "default": "my"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Persona",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Persona"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaysVisits"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Today",
+        "tags": [
+          "visits"
         ]
       }
     },

@@ -114,11 +114,11 @@ class _Seeder:
     def _panel_mix(self) -> tuple[list[int], str]:
         """Visit history (days ago) and status for a typical primary-care panel."""
         roll = self.rng.random()
-        if roll < 0.03:
+        if roll < 0.01:
             return self._visits(200, 2000), "deceased"
-        if roll < 0.15:
+        if roll < 0.06:
             return self._visits(1100, 3000), "inactive"
-        if roll < 0.20:
+        if roll < 0.09:
             # Still active on paper but unseen for 3+ years: the list suggests inactivity.
             return self._visits(1100, 1800), "active"
         return self._visits(14, 900), "active"

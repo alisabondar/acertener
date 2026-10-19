@@ -2,7 +2,15 @@ import { http, HttpResponse } from "msw";
 
 import { PERSONA_HEADER } from "@/api/client";
 
-import { makeCounts, makeMe, makePage, makePatient, makeProblem, PERSONAS } from "../factories";
+import {
+  makeCounts,
+  makeDay,
+  makeMe,
+  makePage,
+  makePatient,
+  makeProblem,
+  PERSONAS,
+} from "../factories";
 
 /** Default handlers every test starts with; override per test with server.use(...). */
 export const handlers = [
@@ -16,4 +24,5 @@ export const handlers = [
   http.get("/api/v1/patients", () => HttpResponse.json(makePage([makePatient()]))),
   http.post("/api/v1/patients/search", () => HttpResponse.json(makePage([]))),
   http.get("/api/v1/patients/filter-counts", () => HttpResponse.json(makeCounts())),
+  http.get("/api/v1/visits/today", () => HttpResponse.json(makeDay([]))),
 ];

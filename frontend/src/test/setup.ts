@@ -1,10 +1,16 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
-import { afterAll, afterEach, vi } from "vite-plus/test";
+import { cleanup, configure } from "@testing-library/react";
+import { afterAll, afterEach, beforeAll, vi } from "vite-plus/test";
 
 import { personaStore } from "@/api/persona";
 
 import { server } from "./msw/server";
+
+// Lazily loaded pages compile on first import; do that up front so no test's wait includes it.
+configure({ asyncUtilTimeout: 3000 });
+beforeAll(async () => {
+  await Promise.all([import("@/patients/PatientList"), import("@/home/MyDay")]);
+});
 
 // jsdom has no matchMedia; report a desktop-width screen so layouts render their desktop form.
 vi.stubGlobal("matchMedia", (query: string) => ({

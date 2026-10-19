@@ -13,6 +13,9 @@ type SearchTerms = components["schemas"]["SearchTerms"];
 export const queryKeys = {
   me: (personaId: string) => ["me", personaId] as const,
   personas: () => ["personas"] as const,
+  visits: {
+    today: (scope: Scope, day: string) => ["visits", "today", scope, day] as const,
+  },
   patients: {
     all: ["patients"] as const,
     list: (params: PatientListParams) => ["patients", "list", params] as const,
@@ -35,8 +38,11 @@ export function useApiQuery<T>(
   {
     enabled = true,
     keepPrevious = false,
+    refetchInterval,
   }: {
     enabled?: boolean;
+    /** Re-fetch this often (ms) while the page is open, for data other people change. */
+    refetchInterval?: number;
     /** While a new key loads, keep returning the previous key's data (isPlaceholderData). */
     keepPrevious?: boolean;
   } = {},
@@ -44,6 +50,7 @@ export function useApiQuery<T>(
   return useQuery<T>({
     queryKey,
     enabled,
+    ...(refetchInterval !== undefined && { refetchInterval }),
     placeholderData: (previous) => (keepPrevious ? previous : undefined),
     queryFn: apiQueryFn(call),
   });
