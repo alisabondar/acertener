@@ -41,6 +41,7 @@ describe("app shell", () => {
   it.each([
     ["/", "My day"],
     ["/patients", "Patients"],
+    ["/patients/new", "New patient"],
     ["/patients/11111111-1111-4111-8111-111111111111", "Osei, Daniel"],
   ])("routes %s to its page", async (path, heading) => {
     renderApp(path);

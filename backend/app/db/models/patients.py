@@ -19,6 +19,7 @@ from app.db.models.base import Base, created_at_column, one_of, updated_at_colum
 from app.db.types import EncryptedDate, EncryptedText
 
 PATIENT_STATUSES = ("active", "inactive", "deceased")
+BLOOD_TYPES = ("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
 ARCHIVE_REASONS = ("entered_in_error", "duplicate", "other")
 
 
@@ -45,6 +46,8 @@ class Patient(Base):
     mrn_fp: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
 
     birth_year: Mapped[int] = mapped_column(SmallInteger, index=True)
+    # Clinical, not an identifier: plaintext like vitals and conditions in v1.
+    blood_type: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default=text("'active'"))
     last_visit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -70,6 +73,9 @@ class Patient(Base):
             postgresql_where=text("archived_at IS NULL"),
         ),
         CheckConstraint(one_of("status", PATIENT_STATUSES), name="status"),
+        CheckConstraint(
+            f"blood_type IS NULL OR {one_of('blood_type', BLOOD_TYPES)}", name="blood_type"
+        ),
         CheckConstraint(
             f"archive_reason IS NULL OR {one_of('archive_reason', ARCHIVE_REASONS)}",
             name="archive_reason",

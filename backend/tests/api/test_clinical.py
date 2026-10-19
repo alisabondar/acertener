@@ -437,3 +437,20 @@ async def test_clinical_writes_and_reads_are_audited(
         ("view", "notes", patient.id),
     ]
     assert entries[0].entity_id == uuid.UUID(note["id"])
+
+
+async def test_a_draft_can_be_deleted_through_its_patient(
+    api: Api, db_session: AsyncSession, patient: Patient, field_cipher: FieldCipher
+) -> None:
+    author = await _user(db_session, "provider")
+    headers = persona_headers(author)
+    note = await _draft(api, author, patient)
+    other = await create_patient(db_session, field_cipher, last_name="Other")
+
+    wrong_patient = await api.delete(
+        f"/api/v1/patients/{other.id}/notes/{note['id']}", headers=headers
+    )
+    deleted = await api.delete(f"/api/v1/patients/{patient.id}/notes/{note['id']}", headers=headers)
+
+    assert wrong_patient.status_code == 404
+    assert deleted.status_code == 204

@@ -231,9 +231,19 @@ export interface paths {
     };
     /** Detail */
     get: operations["detail_api_v1_patients__patient_id__get"];
-    put?: never;
+    /**
+     * Replace
+     * @description Replaces every editable field (PATCH changes only the ones sent). Same version check.
+     */
+    put: operations["replace_api_v1_patients__patient_id__put"];
     post?: never;
-    delete?: never;
+    /**
+     * Delete
+     * @description Medical records are never destroyed: DELETE archives the patient, like POST /archive.
+     *
+     *     The record leaves lists and search, stays viewable by id, and can be restored.
+     */
+    delete: operations["delete_api_v1_patients__patient_id__delete"];
     options?: never;
     head?: never;
     /**
@@ -332,6 +342,26 @@ export interface paths {
     /** Create Note */
     post: operations["create_note_api_v1_patients__patient_id__notes_post"];
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/patients/{patient_id}/notes/{note_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Patient Note
+     * @description The same rules as above (author only, drafts only), scoped to one patient's notes.
+     */
+    delete: operations["delete_patient_note_api_v1_patients__patient_id__notes__note_id__delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -600,6 +630,10 @@ export interface components {
        * Format: uuid
        */
       actor_id: string;
+      /** Actor Name */
+      actor_name: string;
+      /** Actor Role */
+      actor_role: string;
       /** Changed Fields */
       changed_fields: string[];
       /** Entity */
@@ -808,6 +842,8 @@ export interface components {
       address_line1?: string | null;
       /** Address Line2 */
       address_line2?: string | null;
+      /** Blood Type */
+      blood_type?: ("A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-") | null;
       /** City */
       city?: string | null;
       /** Dob */
@@ -829,12 +865,18 @@ export interface components {
       /** State */
       state?: string | null;
     };
-    /** PatientCreate */
+    /**
+     * PatientCreate
+     * @description Registration: besides name, DOB, and MRN, administrative sex and a phone number to reach
+     *     the patient are required, as in most practice registration workflows.
+     */
     PatientCreate: {
       /** Address Line1 */
       address_line1?: string | null;
       /** Address Line2 */
       address_line2?: string | null;
+      /** Blood Type */
+      blood_type?: ("A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-") | null;
       /** City */
       city?: string | null;
       /**
@@ -851,14 +893,17 @@ export interface components {
       email?: string | null;
       /** First Name */
       first_name: string;
-      /** Gender */
-      gender?: ("female" | "male" | "nonbinary" | "other" | "unknown") | null;
+      /**
+       * Gender
+       * @enum {string}
+       */
+      gender: "female" | "male" | "nonbinary" | "other" | "unknown";
       /** Last Name */
       last_name: string;
       /** Mrn */
       mrn: string;
       /** Phone */
-      phone?: string | null;
+      phone: string;
       /** Postal Code */
       postal_code?: string | null;
       /** State */
@@ -879,6 +924,8 @@ export interface components {
       archive_reason: string | null;
       /** Archived */
       archived: boolean;
+      /** Blood Type */
+      blood_type: string | null;
       /** City */
       city: string | null;
       /**
@@ -959,6 +1006,43 @@ export interface components {
       page_size: number;
       /** Total */
       total: number;
+    };
+    /**
+     * PatientReplace
+     * @description A full replacement (PUT): optional fields that aren't sent are cleared.
+     */
+    PatientReplace: {
+      /** Address Line1 */
+      address_line1?: string | null;
+      /** Address Line2 */
+      address_line2?: string | null;
+      /** Base Version */
+      base_version: number;
+      /** Blood Type */
+      blood_type?: ("A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-") | null;
+      /** City */
+      city?: string | null;
+      /**
+       * Dob
+       * Format: date
+       */
+      dob: string;
+      /** Email */
+      email?: string | null;
+      /** First Name */
+      first_name: string;
+      /** Gender */
+      gender?: ("female" | "male" | "nonbinary" | "other" | "unknown") | null;
+      /** Last Name */
+      last_name: string;
+      /** Mrn */
+      mrn: string;
+      /** Phone */
+      phone?: string | null;
+      /** Postal Code */
+      postal_code?: string | null;
+      /** State */
+      state?: string | null;
     };
     /**
      * PatientStatus
@@ -1093,6 +1177,8 @@ export interface components {
       age: number;
       /** Allergies */
       allergies: components["schemas"]["SummaryAllergy"][];
+      /** Blood Type */
+      blood_type: string | null;
       /** Conditions */
       conditions: components["schemas"]["SummaryCondition"][];
       /** First Name */
@@ -1774,6 +1860,76 @@ export interface operations {
       };
     };
   };
+  replace_api_v1_patients__patient_id__put: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Persona"?: string | null;
+      };
+      path: {
+        patient_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PatientReplace"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PatientDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_api_v1_patients__patient_id__delete: {
+    parameters: {
+      query?: {
+        reason?: "entered_in_error" | "duplicate" | "other";
+      };
+      header?: {
+        "X-Persona"?: string | null;
+      };
+      path: {
+        patient_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   update_api_v1_patients__patient_id__patch: {
     parameters: {
       query?: never;
@@ -2082,6 +2238,38 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["NoteOut"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_patient_note_api_v1_patients__patient_id__notes__note_id__delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Persona"?: string | null;
+      };
+      path: {
+        patient_id: string;
+        note_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

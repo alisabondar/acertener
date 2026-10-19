@@ -50,7 +50,7 @@ class PatientService:
             try:
                 patient = await self._repo.create(data)
             except DuplicateMrnError:
-                raise DuplicateMrnConflictError from None
+                raise await self._mrn_taken(data.mrn) from None
             if role := CREATOR_CARE_TEAM_ROLES.get(self._user.role):
                 self._session.add(
                     CareTeamMember(patient_id=patient.id, user_id=self._user.id, role=role)
@@ -118,7 +118,7 @@ class PatientService:
                 try:
                     await self._repo.update(patient.id, **new_values)
                 except DuplicateMrnError:
-                    raise DuplicateMrnConflictError from None
+                    raise await self._mrn_taken(new_values["mrn"]) from None
                 await self._audit.record_change(
                     AuditEntry(action, "patient", patient.id, patient.id, diff)
                 )
@@ -133,3 +133,8 @@ class PatientService:
         if patient is None:
             raise PatientNotFoundError
         return patient
+
+    async def _mrn_taken(self, mrn: str) -> DuplicateMrnConflictError:
+        """The conflict, naming (by id only) the patient who already has the MRN."""
+        holder = await self._repo.find_by_mrn(mrn)
+        return DuplicateMrnConflictError(matches=[str(holder)] if holder else [])

@@ -272,6 +272,14 @@
             "title": "Actor Id",
             "type": "string"
           },
+          "actor_name": {
+            "title": "Actor Name",
+            "type": "string"
+          },
+          "actor_role": {
+            "title": "Actor Role",
+            "type": "string"
+          },
           "changed_fields": {
             "items": {
               "type": "string"
@@ -336,6 +344,8 @@
           "id",
           "occurred_at",
           "actor_id",
+          "actor_name",
+          "actor_role",
           "via_demo_persona",
           "action",
           "entity",
@@ -838,6 +848,27 @@
             ],
             "title": "Address Line2"
           },
+          "blood_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "A+",
+                  "A-",
+                  "B+",
+                  "B-",
+                  "AB+",
+                  "AB-",
+                  "O+",
+                  "O-"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
+          },
           "city": {
             "anyOf": [
               {
@@ -978,6 +1009,7 @@
       },
       "PatientCreate": {
         "additionalProperties": false,
+        "description": "Registration: besides name, DOB, and MRN, administrative sex and a phone number to reach\nthe patient are required, as in most practice registration workflows.",
         "properties": {
           "address_line1": {
             "anyOf": [
@@ -1004,6 +1036,27 @@
               }
             ],
             "title": "Address Line2"
+          },
+          "blood_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "A+",
+                  "A-",
+                  "B+",
+                  "B-",
+                  "AB+",
+                  "AB-",
+                  "O+",
+                  "O-"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
           },
           "city": {
             "anyOf": [
@@ -1048,22 +1101,15 @@
             "type": "string"
           },
           "gender": {
-            "anyOf": [
-              {
-                "enum": [
-                  "female",
-                  "male",
-                  "nonbinary",
-                  "other",
-                  "unknown"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "female",
+              "male",
+              "nonbinary",
+              "other",
+              "unknown"
             ],
-            "title": "Gender"
+            "title": "Gender",
+            "type": "string"
           },
           "last_name": {
             "maxLength": 100,
@@ -1078,17 +1124,10 @@
             "type": "string"
           },
           "phone": {
-            "anyOf": [
-              {
-                "maxLength": 30,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Phone",
+            "type": "string"
           },
           "postal_code": {
             "anyOf": [
@@ -1121,7 +1160,9 @@
           "first_name",
           "last_name",
           "mrn",
-          "dob"
+          "dob",
+          "gender",
+          "phone"
         ],
         "title": "PatientCreate",
         "type": "object"
@@ -1169,6 +1210,17 @@
           "archived": {
             "title": "Archived",
             "type": "boolean"
+          },
+          "blood_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
           },
           "city": {
             "anyOf": [
@@ -1301,6 +1353,7 @@
           "city",
           "state",
           "postal_code",
+          "blood_type",
           "status",
           "last_visit_at",
           "archived",
@@ -1428,6 +1481,178 @@
           "page_size"
         ],
         "title": "PatientPage",
+        "type": "object"
+      },
+      "PatientReplace": {
+        "additionalProperties": false,
+        "description": "A full replacement (PUT): optional fields that aren't sent are cleared.",
+        "properties": {
+          "address_line1": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Line1"
+          },
+          "address_line2": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Line2"
+          },
+          "base_version": {
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "blood_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "A+",
+                  "A-",
+                  "B+",
+                  "B-",
+                  "AB+",
+                  "AB-",
+                  "O+",
+                  "O-"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "dob": {
+            "format": "date",
+            "title": "Dob",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "enum": [
+                  "female",
+                  "male",
+                  "nonbinary",
+                  "other",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "last_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "mrn": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Mrn",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "maxLength": 2,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "mrn",
+          "dob",
+          "base_version"
+        ],
+        "title": "PatientReplace",
         "type": "object"
       },
       "PatientStatus": {
@@ -1736,6 +1961,17 @@
             "title": "Allergies",
             "type": "array"
           },
+          "blood_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
+          },
           "conditions": {
             "items": {
               "$ref": "#/components/schemas/SummaryCondition"
@@ -1756,6 +1992,7 @@
           "first_name",
           "last_name",
           "age",
+          "blood_type",
           "allergies",
           "conditions"
         ],
@@ -3336,6 +3573,72 @@
       }
     },
     "/api/v1/patients/{patient_id}": {
+      "delete": {
+        "description": "Medical records are never destroyed: DELETE archives the patient, like POST /archive.\n\nThe record leaves lists and search, stays viewable by id, and can be restored.",
+        "operationId": "delete_api_v1_patients__patient_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "default": "other",
+              "enum": [
+                "entered_in_error",
+                "duplicate",
+                "other"
+              ],
+              "title": "Reason",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Persona",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Persona"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "patients"
+        ]
+      },
       "get": {
         "operationId": "detail_api_v1_patients__patient_id__get",
         "parameters": [
@@ -3457,6 +3760,74 @@
           }
         },
         "summary": "Update",
+        "tags": [
+          "patients"
+        ]
+      },
+      "put": {
+        "description": "Replaces every editable field (PATCH changes only the ones sent). Same version check.",
+        "operationId": "replace_api_v1_patients__patient_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Persona",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Persona"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientReplace"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace",
         "tags": [
           "patients"
         ]
@@ -3993,6 +4364,69 @@
           }
         },
         "summary": "Create Note",
+        "tags": [
+          "clinical"
+        ]
+      }
+    },
+    "/api/v1/patients/{patient_id}/notes/{note_id}": {
+      "delete": {
+        "description": "The same rules as above (author only, drafts only), scoped to one patient's notes.",
+        "operationId": "delete_patient_note_api_v1_patients__patient_id__notes__note_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Note Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Persona",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Persona"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Patient Note",
         "tags": [
           "clinical"
         ]

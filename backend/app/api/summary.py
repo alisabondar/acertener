@@ -73,6 +73,7 @@ async def _out(
             first_name=patient.first_name,
             last_name=patient.last_name,
             age=age_on(patient.dob, today),
+            blood_type=patient.blood_type,
             allergies=[
                 SummaryAllergy(substance=a.substance, severity=cast(Severity | None, a.severity))
                 for a in allergies

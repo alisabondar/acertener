@@ -24,7 +24,11 @@ async def test_every_role_sees_demographics_and_nothing_clinical(
 ) -> None:
     viewer = await add_user(db_session, role, credential=None)
     patient = await create_patient(
-        db_session, field_cipher, dob=date(datetime.now(UTC).year - 30, 1, 1), city="Springfield"
+        db_session,
+        field_cipher,
+        dob=date(datetime.now(UTC).year - 30, 1, 1),
+        city="Springfield",
+        blood_type="AB-",
     )
     await add_to_care_team(db_session, patient, viewer)
 
@@ -40,6 +44,8 @@ async def test_every_role_sees_demographics_and_nothing_clinical(
     )
     assert (body["on_my_care_team"], body["archived"], body["version"]) == (True, False, 1)
     assert not CLINICAL_FIELDS & body.keys()
+    # Blood type is clinical: only roles that may view clinical data get it.
+    assert body["blood_type"] == ("AB-" if role in ("provider", "nurse") else None)
 
 
 async def test_unknown_patient_is_a_404(api: httpx2.AsyncClient, db_session: AsyncSession) -> None:

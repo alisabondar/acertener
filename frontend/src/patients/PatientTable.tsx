@@ -110,7 +110,7 @@ export const PatientTable = memo(function PatientTable({
                 <LastVisit at={patient.last_visit_at} />
               </TableCell>
               {showProblems && (
-                <TableCell className="max-w-64 text-[13px]">
+                <TableCell className="max-w-72 text-[13px]">
                   <Problems names={patient.active_problems ?? []} />
                 </TableCell>
               )}
@@ -196,15 +196,13 @@ function Tag({ children, className }: { children: string; className?: string }) 
   );
 }
 
-/** The first two active problems, then a count of the rest. */
+/** Today's reason, then chronic conditions, then the rest, on one line; the tooltip has them all. */
 function Problems({ names }: { names: string[] }) {
   if (names.length === 0) return <span className="text-muted-foreground">None</span>;
-  const shown = names.slice(0, 2).join(", ");
-  const more = names.length - 2;
+  const all = names.join(", ");
   return (
-    <span title={names.join(", ")}>
-      {shown}
-      {more > 0 && <span className="text-muted-foreground"> +{more} more</span>}
+    <span title={all} className="block truncate">
+      {all}
     </span>
   );
 }

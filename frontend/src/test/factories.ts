@@ -143,6 +143,7 @@ export function makeDetail(overrides: Partial<PatientDetail> = {}): PatientDetai
     city: "Springfield",
     state: "IL",
     postal_code: "62701",
+    blood_type: "O+",
     status: "active",
     last_visit_at: "2026-05-18T14:00:00Z",
     archived: false,

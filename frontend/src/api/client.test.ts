@@ -49,7 +49,14 @@ describe("api client", () => {
     );
 
     const call = createApiClient({ getPersona: () => PERSONA }).POST("/api/v1/patients", {
-      body: { first_name: "Ada", last_name: "Smith", mrn: "MRN-1", dob: "1990-01-01" },
+      body: {
+        first_name: "Ada",
+        last_name: "Smith",
+        mrn: "MRN-1",
+        dob: "1990-01-01",
+        gender: "female",
+        phone: "555-867-5309",
+      },
     });
 
     await expect(call).rejects.toMatchObject({

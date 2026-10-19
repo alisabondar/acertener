@@ -26,6 +26,7 @@ def _new(**overrides: Any) -> dict[str, Any]:
         "dob": "1984-02-29",
         "gender": "female",
         "phone": "555-555-0100",
+        "blood_type": "O-",
     }
     body.update(overrides)
     return body
@@ -66,6 +67,8 @@ async def test_create_returns_201_and_adds_clinical_creators_to_the_care_team(
     assert response.status_code == 201
     body = response.json()
     assert (body["last_name"], body["dob"], body["version"]) == (CANARY, "1984-02-29", 1)
+    # Clinical data: front desk can enter it but doesn't get it back.
+    assert body["blood_type"] == ("O-" if role in ("provider", "nurse") else None)
     assert body["on_my_care_team"] is joins_care_team
     [entry] = await _audit(db_session, "create")
     assert (str(entry.patient_id), entry.actor_id) == (body["id"], creator.id)
@@ -119,7 +122,7 @@ async def test_duplicate_mrn_is_a_hard_409_on_create_and_edit(
     api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
     creator = await add_user(db_session)
-    await create_patient(db_session, field_cipher, mrn="MRN-555")
+    holder = await create_patient(db_session, field_cipher, mrn="MRN-555")
     other = await create_patient(db_session, field_cipher, mrn="MRN-556", last_name="Other")
 
     created = await _create(api, creator, mrn=" mrn-555 ", confirm_not_duplicate=True)
@@ -129,6 +132,8 @@ async def test_duplicate_mrn_is_a_hard_409_on_create_and_edit(
         assert response.status_code == 409
         assert response.json()["code"] == "DUPLICATE_MRN"
         assert "555" not in response.json()["detail"]
+        # Points at the patient who has the MRN, so the form can link to their chart.
+        assert response.json()["matches"] == [str(holder.id)]
 
 
 async def test_edit_saves_and_audits_only_changed_fields(
@@ -211,3 +216,42 @@ async def test_a_failed_audit_write_rolls_back_the_change(
 
     assert response.status_code == 500
     assert await _patient_count(db_session) == 0
+
+
+async def test_put_replaces_every_field_and_clears_the_ones_left_out(
+    api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    editor = await add_user(db_session, "front_desk")
+    patient = await create_patient(
+        db_session, field_cipher, city="Springfield", phone="555-555-0100"
+    )
+    url = f"/api/v1/patients/{patient.id}"
+    full = {"first_name": "Ada", "last_name": "Jones", "mrn": patient.mrn, "dob": "1990-01-31"}
+
+    replaced = await api.put(url, json={"base_version": 1, **full}, headers=persona_headers(editor))
+    stale = await api.put(url, json={"base_version": 1, **full}, headers=persona_headers(editor))
+
+    assert replaced.status_code == 200
+    body = replaced.json()
+    assert (body["last_name"], body["city"], body["phone"], body["version"]) == (
+        "Jones",
+        None,
+        None,
+        2,
+    )
+    assert stale.status_code == 409
+
+
+async def test_put_leaves_clinical_fields_alone_for_roles_that_cant_see_them(
+    api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    desk = await add_user(db_session, "front_desk")
+    nurse = await add_user(db_session, "nurse")
+    patient = await create_patient(db_session, field_cipher, blood_type="AB-")
+    url = f"/api/v1/patients/{patient.id}"
+    full = {"first_name": "Ada", "last_name": "Jones", "mrn": patient.mrn, "dob": "1990-01-31"}
+
+    await api.put(url, json={"base_version": 1, **full}, headers=persona_headers(desk))
+    seen_by_nurse = await api.get(url, headers=persona_headers(nurse))
+
+    assert seen_by_nurse.json()["blood_type"] == "AB-"

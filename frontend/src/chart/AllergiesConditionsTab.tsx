@@ -14,6 +14,7 @@ import { api } from "@/api";
 import { queryKeys, setServerErrors, useApiMutation } from "@/api/queries";
 import type { components } from "@/api/schema";
 import { usePermission } from "@/auth/context";
+import { NativeSelect } from "@/components/NativeSelect";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -242,15 +243,12 @@ function AddAllergy({ patientId }: { patientId: string }) {
               <FormItem>
                 <FormLabel>Severity</FormLabel>
                 <FormControl>
-                  <select
-                    {...field}
-                    className="h-8 rounded-lg border bg-card px-2 text-[14px] text-foreground"
-                  >
+                  <NativeSelect {...field}>
                     <option value="">Unknown</option>
                     <option value="mild">Mild</option>
                     <option value="moderate">Moderate</option>
                     <option value="severe">Severe</option>
-                  </select>
+                  </NativeSelect>
                 </FormControl>
               </FormItem>
             )}

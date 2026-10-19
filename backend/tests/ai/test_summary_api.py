@@ -29,6 +29,7 @@ from app.config import Settings
 from app.crypto import FieldCipher
 from app.db import create_engine
 from app.db.models import AuditLog, Condition, Note, Patient, PatientSummary, User
+from app.errors import PatientNotFoundError
 from app.patients.derived import age_on
 from app.patients.queries import practice_today
 from tests.factories import add_user, create_patient, make_audit, persona_headers
@@ -64,7 +65,9 @@ async def doctor(db_session: AsyncSession) -> User:
 
 @pytest.fixture
 async def patient(db_session: AsyncSession, field_cipher: FieldCipher, doctor: User) -> Patient:
-    patient = await create_patient(db_session, field_cipher, first_name="Rose", last_name="Oneil")
+    patient = await create_patient(
+        db_session, field_cipher, first_name="Rose", last_name="Oneil", blood_type="B+"
+    )
     db_session.add(
         Condition(
             patient_id=patient.id, icd10_code="I10", name="Hypertension", recorded_by=doctor.id
@@ -107,6 +110,7 @@ async def test_a_first_view_generates_a_summary_with_a_deterministic_header(
     today = practice_today(datetime.now(UTC), ZoneInfo(settings.practice_timezone))
     assert (first["header"]["first_name"], first["header"]["last_name"]) == ("Rose", "Oneil")
     assert first["header"]["age"] == age_on(date(1990, 1, 31), today)
+    assert first["header"]["blood_type"] == "B+"
     assert first["header"]["conditions"] == [{"icd10_code": "I10", "name": "Hypertension"}]
     assert second["status"] == "fresh"
     assert "Hypertension" in second["narrative"]
@@ -526,3 +530,9 @@ async def test_canary_through_the_full_stack_never_leaves_in_an_outbound_byte(
         str(patient.id),
     ):
         assert canary not in outbound, canary
+
+
+async def test_the_header_of_an_unknown_patient_is_not_found(db_session: AsyncSession) -> None:
+    """The API checks first (via view()), but the service guards its own callers too."""
+    with pytest.raises(PatientNotFoundError):
+        await SummaryService(db_session, timedelta(seconds=15)).header(uuid.uuid4())

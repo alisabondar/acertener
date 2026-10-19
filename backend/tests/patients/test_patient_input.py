@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.patients import PatientChanges, PatientFields
+from app.schemas.patients import PatientChanges, PatientCreate, PatientFields
 
 
 @pytest.mark.parametrize("field", ["first_name", "last_name", "mrn", "dob"])
@@ -57,7 +57,8 @@ def test_inner_spaces_in_names_are_collapsed() -> None:
     ("field", "good", "bad"),
     [
         ("mrn", "MRN-100000", "MRN 1!"),
-        ("mrn", "A12345", "MRN-"),
+        ("mrn", "100000", "MRN-"),
+        ("mrn", "mrn-100000", "A12345"),
         ("phone", "555-867-5309", "555-0100"),
         ("phone", "(555) 867 5309", "call me"),
         ("phone", "+1 555 867 5309", "+44 20 7946 0958 1234"),
@@ -86,3 +87,30 @@ def test_phone_and_state_are_stored_in_one_format() -> None:
 def test_edits_follow_the_same_rules() -> None:
     with pytest.raises(ValidationError, match="letters"):
         PatientChanges.model_validate({"last_name": "x1!!"})
+
+
+@pytest.mark.parametrize("blood_type", ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
+def test_blood_types_are_the_eight_abo_rh_groups(blood_type: str) -> None:
+    assert (
+        PatientFields.model_validate({**VALID, "blood_type": blood_type}).blood_type == blood_type
+    )
+
+
+@pytest.mark.parametrize("blood_type", ["C+", "A", "O positive", "ab+"])
+def test_other_blood_types_are_rejected(blood_type: str) -> None:
+    with pytest.raises(ValidationError):
+        PatientFields.model_validate({**VALID, "blood_type": blood_type})
+
+
+@pytest.mark.parametrize("missing", ["first_name", "last_name", "dob", "mrn", "gender", "phone"])
+def test_registration_needs_the_critical_fields(missing: str) -> None:
+    complete = {**VALID, "gender": "female", "phone": "555-867-5309"}
+    del complete[missing]
+
+    with pytest.raises(ValidationError):
+        PatientCreate.model_validate(complete)
+
+
+@pytest.mark.parametrize("typed", ["100234", "MRN-100234", " mrn-100234 "])
+def test_mrns_are_stored_in_one_format(typed: str) -> None:
+    assert PatientFields.model_validate({**VALID, "mrn": typed}).mrn == "MRN-100234"

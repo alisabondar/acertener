@@ -24,6 +24,7 @@ class SummaryHeader(BaseModel):
     first_name: str
     last_name: str
     age: int
+    blood_type: str | None
     allergies: list[SummaryAllergy]
     conditions: list[SummaryCondition]
 

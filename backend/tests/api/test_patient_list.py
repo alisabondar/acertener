@@ -272,5 +272,21 @@ async def test_clinical_roles_see_active_problems_and_front_desk_does_not(
     desk = await _list(api, persona_headers(front_desk), scope="all")
 
     [row] = [p for p in clinical["items"] if p["id"] == str(patient.id)]
-    assert sorted(row["active_problems"]) == ["Hypertension", "Type 2 diabetes"]
+    # Chronic conditions (by ICD-10 category) lead; resolved ones aren't listed.
+    assert row["active_problems"] == ["Hypertension", "Type 2 diabetes"]
     assert all(p["active_problems"] is None for p in desk["items"])
+
+
+async def test_todays_visit_reason_leads_the_problem_list(
+    api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher, me: User
+) -> None:
+    patient = await _patient(db_session, field_cipher)
+    db_session.add(
+        Condition(patient_id=patient.id, icd10_code="I10", name="Hypertension", recorded_by=me.id)
+    )
+    await add_visit(db_session, patient, me, NOW, "checked_in", reason="Medication review")
+
+    page = await _list(api, persona_headers(me), scope="all")
+
+    [row] = [p for p in page["items"] if p["id"] == str(patient.id)]
+    assert row["active_problems"] == ["Today: Medication review", "Hypertension"]

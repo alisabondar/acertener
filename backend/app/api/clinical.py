@@ -123,6 +123,15 @@ async def delete_note(note_id: uuid.UUID, clinical: NoteDeleter) -> Response:
     return Response(status_code=204)
 
 
+@router.delete("/patients/{patient_id}/notes/{note_id}", status_code=204)
+async def delete_patient_note(
+    patient_id: uuid.UUID, note_id: uuid.UUID, clinical: NoteDeleter
+) -> Response:
+    """The same rules as above (author only, drafts only), scoped to one patient's notes."""
+    await clinical.delete_note(note_id, patient_id)
+    return Response(status_code=204)
+
+
 # --- Vitals --------------------------------------------------------------------------------
 
 

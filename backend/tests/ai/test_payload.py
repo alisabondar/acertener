@@ -67,7 +67,7 @@ def test_holds_only_de_identified_clinical_context(ids: PatientIdentifiers) -> N
     assert [c.icd10_code for c in context.conditions] == ["I10"]
     # Active allergies only, as substance and severity: what a summary needs to flag a risk.
     assert [(a.substance, a.severity) for a in context.allergies] == [("Lisinopril", "severe")]
-    assert leak_check(context.model_dump_json(), ids).ok
+    assert leak_check(context.model_dump_json(), ids, context.clinical_terms()).ok
 
 
 def test_ages_over_89_are_sent_as_90_plus(ids: PatientIdentifiers) -> None:

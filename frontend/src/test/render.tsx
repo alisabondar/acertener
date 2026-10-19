@@ -16,6 +16,8 @@ beforeAll(async () => {
     import("@/patients/PatientList"),
     import("@/home/MyDay"),
     import("@/chart/PatientChart"),
+    import("@/patients/PatientForm"),
+    import("@/admin/AuditLog"),
   ]);
 }, 60_000);
 

@@ -4,6 +4,7 @@ It deliberately shares no code with the scrubber: a bug there must not also hide
 blocks the request. Results name detectors only, never the values they matched.
 """
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -111,6 +112,37 @@ def _identifier_hits(text: str, ids: PatientIdentifiers) -> set[str]:
     return hits
 
 
+def _words(text: str) -> set[str]:
+    """Letter-only words, case-folded: "Hyperlipidemia, unspecified" gives two words, no comma."""
+    return {word.casefold() for word in re.findall(r"[^\W\d_]+", text)}
+
+
+def _prose(text: str) -> str:
+    """What the name detector should read: a JSON payload's string values, as sentences.
+
+    Read as raw JSON, the detector takes syntax like 'check","status"' for a name. The exact and
+    pattern checks still scan the whole raw text, so nothing escapes them.
+    """
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return text
+    values: list[str] = []
+
+    def collect(node: object) -> None:
+        if isinstance(node, str):
+            values.append(node)
+        elif isinstance(node, dict):
+            for value in node.values():
+                collect(value)
+        elif isinstance(node, list):
+            for value in node:
+                collect(value)
+
+    collect(data)
+    return ". ".join(values)
+
+
 def leak_check(
     text: str, ids: PatientIdentifiers, clinical_terms: frozenset[str] = frozenset()
 ) -> LeakResult:
@@ -122,9 +154,11 @@ def leak_check(
     """
     hits = _identifier_hits(text, ids)
     hits |= {name for name, pattern in _GENERIC.items() if pattern.search(text)}
-    known = {word.casefold() for term in clinical_terms for word in term.split()}
-    for start, end, kind in find_entities(text, ("PERSON", "LOCATION")):
-        if known and all(word.casefold() in known for word in text[start:end].split()):
+    known = {word for term in clinical_terms for word in _words(term)}
+    prose = _prose(text)
+    for start, end, kind in find_entities(prose, ("PERSON", "LOCATION")):
+        found = _words(prose[start:end])
+        if found and found <= known:
             continue
         hits.add("person_name" if kind == "PERSON" else "location")
     return LeakResult(tuple(sorted(hits)))

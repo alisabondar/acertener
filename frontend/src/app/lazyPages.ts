@@ -8,3 +8,12 @@ export const MyDay = lazy(() => import("@/home/MyDay").then((m) => ({ default: m
 export const PatientChart = lazy(() =>
   import("@/chart/PatientChart").then((m) => ({ default: m.PatientChart })),
 );
+export const NewPatient = lazy(() =>
+  import("@/patients/PatientForm").then((m) => ({ default: m.NewPatient })),
+);
+export const EditPatient = lazy(() =>
+  import("@/patients/PatientForm").then((m) => ({ default: m.EditPatient })),
+);
+export const AuditLog = lazy(() =>
+  import("@/admin/AuditLog").then((m) => ({ default: m.AuditLog })),
+);

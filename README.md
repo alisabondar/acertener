@@ -7,8 +7,20 @@ and an AI summary that can't leak who the patient is. All data is synthetic.
 git clone https://github.com/alisabondar/acertener.git && cd acertener && ./dev.sh
 ```
 
-Docker is the only prerequisite. Then open http://localhost:5173: there's no login, and the
-"Viewing as" menu switches roles. See [Getting started](docs/getting-started.md) for the tour.
+## Run locally
+
+Docker is the only prerequisite. The command above builds everything, seeds 10,000 synthetic
+patients (about a minute the first time), and prints the URLs:
+
+- **App:** http://localhost:5173 · **API docs:** http://localhost:8000/docs
+- **No login in the demo:** you start as **Dr. Wei Chen** (provider). The **"Viewing as"** menu
+  switches between Jordan Rivera (NP), Sam Okafor (RN), Taylor Brooks (front desk), and Practice
+  Admin; each role sees and can do only what it's allowed.
+- **AI summaries:** `./dev.sh` asks once for an optional Gemini key; without one, a built-in mock
+  writes them.
+- **More:** `./dev.sh test` (all tests), `./dev.sh proof` (see the encryption),
+  `./dev.sh reset` (fresh data), `./dev.sh stop`. The full tour is in
+  [Getting started](docs/getting-started.md).
 
 ## Features
 

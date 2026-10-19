@@ -151,9 +151,12 @@ class ClinicalService:
             )
         return await self._reload(note)
 
-    async def delete_note(self, note_id: uuid.UUID) -> None:
-        """Soft delete; only drafts. A finalized note is part of the record (amend it instead)."""
-        note = await self._own_draft(note_id)
+    async def delete_note(self, note_id: uuid.UUID, patient_id: uuid.UUID | None = None) -> None:
+        """Soft delete; only drafts. A finalized note is part of the record (amend it instead).
+
+        With `patient_id`, the note must belong to that patient (otherwise it's not found).
+        """
+        note = await self._own_draft(note_id, patient_id)
         async with transaction(self._session):
             note.deleted_at = datetime.now(UTC)
             note.deleted_by = self._user.id
@@ -161,9 +164,12 @@ class ClinicalService:
                 AuditAction.DELETE, "note", note.id, note.patient_id, affects_summary=False
             )
 
-    async def _own_draft(self, note_id: uuid.UUID) -> Note:
+    async def _own_draft(self, note_id: uuid.UUID, patient_id: uuid.UUID | None = None) -> Note:
         note = await self._session.get(Note, note_id)
-        if note is None or note.deleted_at is not None:
+        wrong_patient = (
+            patient_id is not None and note is not None and note.patient_id != patient_id
+        )
+        if note is None or note.deleted_at is not None or wrong_patient:
             raise NotFoundError("Note not found.")
         if note.author_id != self._user.id:
             raise NotNoteAuthorError

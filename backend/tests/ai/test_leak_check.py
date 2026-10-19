@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from app.ai.identifiers import PatientIdentifiers
@@ -75,3 +77,52 @@ def test_a_clinical_term_never_hides_this_patients_name(ids: PatientIdentifiers)
     result = leak_check("Allergies: Rose (severe).", ids, frozenset({"Rose"}))
 
     assert "patient_name" in result.detectors
+
+
+def test_a_clinical_term_with_punctuation_still_counts(ids: PatientIdentifiers) -> None:
+    """A real mock reply: the detector reads "Hyperlipidemia" as a person here."""
+    reply = (
+        "36-year-old male with Type 2 diabetes mellitus without complications, Essential (primary) "
+        "hypertension, Hyperlipidemia, unspecified. Last visit today (Medication review). Most "
+        "recent BP 131/77. Allergies: Latex (mild). 2 finalized notes reviewed."
+    )
+    terms = frozenset(
+        {
+            "Essential (primary) hypertension",
+            "Hyperlipidemia, unspecified",
+            "Latex",
+            "Type 2 diabetes mellitus without complications",
+        }
+    )
+
+    assert leak_check(reply, ids, terms).ok
+
+
+def test_the_name_detector_reads_a_json_payload_as_values_not_syntax(
+    ids: PatientIdentifiers,
+) -> None:
+    """A real payload: across JSON syntax the detector saw a "name" in 'check","status"...'."""
+    visits = [
+        (-680, "Diabetes check"),
+        (-363, "Cough and congestion"),
+        (-194, "Annual physical"),
+        (-109, "Anxiety follow-up"),
+        (0, "Diabetes check"),
+    ]
+    payload = json.dumps(
+        {
+            "age": "1",
+            "sex": "male",
+            "visits": [{"day_offset": d, "reason": r, "status": "completed"} for d, r in visits],
+            "notes": [
+                {
+                    "day_offset": -363,
+                    "text": "Cough and congestion. Vitals reviewed. Discussed diet and exercise; "
+                    "follow up as needed.",
+                }
+            ],
+        },
+        separators=(",", ":"),
+    )
+
+    assert leak_check(payload, ids).ok

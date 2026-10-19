@@ -88,6 +88,11 @@ describe("patient chart", () => {
     expect(header).toHaveTextContent("Osei, Daniel");
     expect(header).toHaveTextContent("04/02/1963 (63y)");
     expect(header).toHaveTextContent("MRN-100008");
+    expect(header).toHaveTextContent("Blood type O+");
+    expect(within(header).getByRole("link", { name: "Edit details" })).toHaveAttribute(
+      "href",
+      "/patients/44444444-4444-4444-8444-000000000001/edit",
+    );
     const alert = await screen.findByRole("alert", { name: "Severe allergies" });
     expect(alert).toHaveTextContent("Penicillin");
     expect(alert).not.toHaveTextContent("Latex");

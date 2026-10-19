@@ -1,5 +1,6 @@
+import { ContentSkeleton } from "@/components/PageSkeleton";
 import { Toaster } from "@/components/ui/sonner";
-import { CalendarDays, LoaderCircle, ScrollText, Users } from "lucide-react";
+import { CalendarDays, LoaderCircle, ScrollText, UserPlus, Users } from "lucide-react";
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
@@ -45,7 +46,15 @@ const NAV: {
     label: "Patients",
     icon: Users,
     permission: "VIEW_DEMOGRAPHICS",
-    owns: (path: string) => path === "/patients" || path.startsWith("/patients/"),
+    owns: (path: string) =>
+      path === "/patients" || (path.startsWith("/patients/") && !path.startsWith("/patients/new")),
+  },
+  {
+    to: "/patients/new",
+    label: "New patient",
+    icon: UserPlus,
+    permission: "CREATE_PATIENT",
+    owns: (path: string) => path.startsWith("/patients/new"),
   },
   {
     to: "/admin/audit",
@@ -130,11 +139,11 @@ function SwitchingPersona({ personaName }: { personaName: string }) {
   );
 }
 
-/** While a page's code downloads on first visit. */
+/** While a page's code downloads on first visit: the page's shape, not a spinner. */
 function PageLoading() {
   return (
-    <div role="status" aria-label="Loading page" className="flex justify-center py-24">
-      <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden />
+    <div role="status" aria-label="Loading page">
+      <ContentSkeleton />
     </div>
   );
 }

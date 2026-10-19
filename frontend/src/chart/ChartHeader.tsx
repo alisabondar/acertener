@@ -1,6 +1,9 @@
-import { TriangleAlert } from "lucide-react";
+import { Pencil, TriangleAlert } from "lucide-react";
+import { Link } from "react-router";
 
 import type { components } from "@/api/schema";
+import { usePermission } from "@/auth/context";
+import { Button } from "@/components/ui/button";
 import { formatDob } from "@/lib/format";
 import { StatusPill } from "@/patients/StatusPill";
 
@@ -19,6 +22,7 @@ export function ChartHeader({
   showAllergies: boolean;
 }) {
   const allergies = useChartAllergies(patient.id, showAllergies);
+  const canEdit = usePermission("EDIT_DEMOGRAPHICS");
   const severe = (allergies.data?.items ?? []).filter(
     (a) => a.status === "active" && a.severity === "severe",
   );
@@ -34,10 +38,19 @@ export function ChartHeader({
             Archived
           </span>
         )}
+        {canEdit && (
+          <Button asChild variant="outline" size="sm" className="ml-auto">
+            <Link to={`/patients/${patient.id}/edit`}>
+              <Pencil className="size-4" aria-hidden />
+              Edit details
+            </Link>
+          </Button>
+        )}
       </div>
       <p className="text-[14px] text-muted-foreground tabular-nums">
         {formatDob(patient.dob)} ({patient.age}y)
         {patient.gender && ` · ${SEX[patient.gender] ?? "U"}`} · {patient.mrn}
+        {patient.blood_type && ` · Blood type ${patient.blood_type}`}
       </p>
       {severe.length > 0 && (
         <p

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { memo, Profiler, type ComponentProps, type ProfilerOnRenderCallback } from "react";
@@ -37,10 +37,12 @@ describe("patient list performance (React Profiler)", () => {
         HttpResponse.json(makePage([makePatient({ last_name: "Osei" })])),
       ),
     );
-    renderApp("/patients");
+    const { queryClient } = renderApp("/patients");
     await screen.findAllByRole("row", { name: /MRN-/ });
-    // Count only after the first load settles: the filter counts arrive separately.
+    // Count only after the first load settles: every request (list, counts, the next page's
+    // prefetch) has finished, so nothing but typing can re-render the table.
     await screen.findByRole("button", { name: /^Active \d/ });
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     const box = screen.getByRole("searchbox", { name: "Search patients" });
     commits.list = [];
 

@@ -195,3 +195,22 @@ async def test_a_failed_audit_write_rolls_back_the_action(
     assert response.status_code == 500
     await db_session.refresh(patient)
     assert patient.archived_at is None
+
+
+async def test_delete_archives_the_record_instead_of_destroying_it(
+    api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    admin = await add_user(db_session, "admin")
+    provider = await add_user(db_session, "provider")
+    patient = await create_patient(db_session, field_cipher)
+    url = f"/api/v1/patients/{patient.id}"
+
+    refused = await api.delete(url, headers=persona_headers(provider))
+    deleted = await api.delete(url, params={"reason": "duplicate"}, headers=persona_headers(admin))
+    still_there = await api.get(url, headers=persona_headers(admin))
+
+    assert refused.status_code == 403
+    assert deleted.status_code == 204
+    assert still_there.json()["archived"] is True
+    assert still_there.json()["archive_reason"] == "duplicate"
+    assert "archive" in await _actions(db_session)

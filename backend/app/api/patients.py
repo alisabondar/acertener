@@ -1,24 +1,26 @@
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import Audit, AuditAction, AuditEntry, changed_fields, get_audit
 from app.auth.permissions import Permission, has_permission, require
-from app.db.models import AuditLog, Condition, Patient, User
+from app.db.models import AuditLog, Condition, Patient, User, Visit
 from app.db.session import DbSession
 from app.db.types import get_field_cipher
 from app.errors import PatientNotFoundError, VersionConflictError
 from app.patients.derived import age_on, inactivity_suggested
+from app.patients.problems import order_problems
 from app.patients.queries import (
     ListedPatient,
     ListParams,
     count_filters,
+    day_bounds,
     list_patients,
     on_care_team,
     practice_today,
@@ -35,6 +37,7 @@ from app.schemas.patients import (
     PatientDetail,
     PatientListItem,
     PatientPage,
+    PatientReplace,
     PatientStatus,
     PatientUpdate,
     QuickFilter,
@@ -67,6 +70,9 @@ def list_params(
 
 Params = Annotated[ListParams, Depends(list_params)]
 
+# Patient fields that are clinical data: sent only to roles that may view clinical data.
+CLINICAL_PATIENT_FIELDS = {"blood_type"}
+
 
 def _item(
     row: ListedPatient, today: date, years: int, problems: dict[uuid.UUID, list[str]] | None
@@ -89,18 +95,33 @@ def _item(
 
 
 async def _active_problems(
-    session: AsyncSession, patient_ids: list[uuid.UUID]
+    session: AsyncSession, patient_ids: list[uuid.UUID], today: date, tz: ZoneInfo
 ) -> dict[uuid.UUID, list[str]]:
-    """Active condition names for one page of patients, in one query."""
+    """For one page of patients, in two queries: today's visit reason, then active conditions."""
+    start, end = day_bounds(today, tz)
+    visits = await session.scalars(
+        select(Visit)
+        .where(
+            Visit.patient_id.in_(patient_ids),
+            Visit.scheduled_at >= start,
+            Visit.scheduled_at < end,
+            Visit.status != "cancelled",
+        )
+        .order_by(Visit.scheduled_at)
+    )
+    reasons: dict[uuid.UUID, str] = {}
+    for visit in visits:
+        if visit.reason:
+            reasons.setdefault(visit.patient_id, visit.reason)
     rows = await session.execute(
-        select(Condition.patient_id, Condition.name)
+        select(Condition.patient_id, Condition.icd10_code, Condition.name)
         .where(Condition.patient_id.in_(patient_ids), Condition.status == "active")
         .order_by(Condition.created_at)
     )
-    problems: dict[uuid.UUID, list[str]] = {}
-    for patient_id, name in rows:
-        problems.setdefault(patient_id, []).append(name)
-    return problems
+    conditions: dict[uuid.UUID, list[tuple[str, str]]] = {}
+    for patient_id, code, name in rows:
+        conditions.setdefault(patient_id, []).append((code, name))
+    return {pid: order_problems(reasons.get(pid), conditions.get(pid, [])) for pid in patient_ids}
 
 
 async def _page(
@@ -115,7 +136,7 @@ async def _page(
     rows, total = await list_patients(session, get_field_cipher(), user, params, today, tz, terms)
     years = request.app.state.settings.inactive_after_years
     problems = (
-        await _active_problems(session, [r.patient.id for r in rows])
+        await _active_problems(session, [r.patient.id for r in rows], today, tz)
         if has_permission(user, Permission.VIEW_CLINICAL)
         else None
     )
@@ -194,6 +215,7 @@ async def _detail_out(
         city=patient.city,
         state=patient.state,
         postal_code=patient.postal_code,
+        blood_type=patient.blood_type if has_permission(user, Permission.VIEW_CLINICAL) else None,
         status=PatientStatus(patient.status),
         last_visit_at=patient.last_visit_at,
         archived=patient.archived_at is not None,
@@ -247,6 +269,26 @@ async def update(
     return await _detail_out(request, session, user, patient)
 
 
+@router.put("/{patient_id:uuid}")
+async def replace(
+    request: Request,
+    patient_id: uuid.UUID,
+    body: PatientReplace,
+    user: Annotated[User, Depends(require(Permission.EDIT_DEMOGRAPHICS))],
+    session: DbSession,
+    audit: AuditDep,
+) -> PatientDetail:
+    """Replaces every editable field (PATCH changes only the ones sent). Same version check."""
+    service = PatientService(session, get_field_cipher(), user, audit)
+    # A role that never receives clinical fields can't have cleared them by leaving them out.
+    hidden = set() if has_permission(user, Permission.VIEW_CLINICAL) else CLINICAL_PATIENT_FIELDS
+    fields = body.model_dump(exclude={"base_version", *hidden})
+    patient = await _saved(
+        request, session, user, service.update(patient_id, body.base_version, fields)
+    )
+    return await _detail_out(request, session, user, patient)
+
+
 async def _saved(
     request: Request, session: AsyncSession, user: User, write: Awaitable[Patient]
 ) -> Patient:
@@ -293,6 +335,24 @@ async def archive(
         request, session, user, service.archive(patient_id, body.base_version, body.reason)
     )
     return await _detail_out(request, session, user, patient)
+
+
+@router.delete("/{patient_id:uuid}", status_code=204)
+async def delete(
+    patient_id: uuid.UUID,
+    user: Archiver,
+    session: DbSession,
+    audit: AuditDep,
+    reason: Literal["entered_in_error", "duplicate", "other"] = "other",
+) -> Response:
+    """Medical records are never destroyed: DELETE archives the patient, like POST /archive.
+
+    The record leaves lists and search, stays viewable by id, and can be restored.
+    """
+    patient = await _get_patient(session, patient_id)
+    service = PatientService(session, get_field_cipher(), user, audit)
+    await service.archive(patient_id, patient.version, reason)
+    return Response(status_code=204)
 
 
 @router.post("/{patient_id:uuid}/restore")

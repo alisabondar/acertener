@@ -63,7 +63,7 @@ describe("patient list", () => {
         makePage([
           makePatient({
             last_name: "Osei",
-            active_problems: ["Hypertension", "Type 2 diabetes", "Asthma"],
+            active_problems: ["Today: Medication review", "Hypertension", "Type 2 diabetes"],
           }),
           makePatient({ last_name: "Becker", active_problems: [] }),
         ]),
@@ -73,7 +73,15 @@ describe("patient list", () => {
 
     const [osei, becker] = await rows();
     expect(screen.getByRole("columnheader", { name: "Active problems" })).toBeInTheDocument();
-    expect(osei).toHaveTextContent("Hypertension, Type 2 diabetes +1 more");
+    const problems = within(osei!).getByText(
+      "Today: Medication review, Hypertension, Type 2 diabetes",
+    );
+    // One line, cut with an ellipsis; the full list is in the tooltip.
+    expect(problems).toHaveClass("truncate");
+    expect(problems).toHaveAttribute(
+      "title",
+      "Today: Medication review, Hypertension, Type 2 diabetes",
+    );
     expect(becker).toHaveTextContent("None");
   });
 

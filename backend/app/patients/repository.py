@@ -58,6 +58,7 @@ class NewPatient:
     city: str | None = None
     state: str | None = None
     postal_code: str | None = None
+    blood_type: str | None = None
 
 
 UPDATABLE_FIELDS = frozenset(
@@ -141,6 +142,11 @@ class PatientRepository:
         # Ciphertext can't be sorted by name, so the most recently seen come first.
         query = query.order_by(Patient.last_visit_at.desc().nulls_last(), Patient.id).limit(limit)
         return list(await self._session.scalars(query))
+
+    async def find_by_mrn(self, mrn: str) -> uuid.UUID | None:
+        return await self._session.scalar(
+            select(Patient.id).where(Patient.mrn_fp == self._cipher.fingerprint(Purpose.MRN, mrn))
+        )
 
     async def find_likely_duplicates(self, last_name: str, dob: date) -> list[uuid.UUID]:
         """Current patients with the same last name and DOB (a warning, not proof)."""

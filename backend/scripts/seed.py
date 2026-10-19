@@ -53,6 +53,17 @@ TODAYS_STATUSES = [
     "scheduled",
 ]
 TODAYS_VISITS_EACH = len(TODAYS_STATUSES)
+# Roughly the US distribution of ABO/Rh blood types.
+BLOOD_TYPE_WEIGHTS = {
+    "O+": 37,
+    "A+": 36,
+    "B+": 9,
+    "O-": 7,
+    "A-": 6,
+    "AB+": 3,
+    "B-": 2,
+    "AB-": 1,
+}
 # Of inactive and deceased patients, the share an administrator has archived.
 ARCHIVED_SHARE_OF_CLOSED = 0.2
 
@@ -199,6 +210,9 @@ class _Seeder:
                 mrn=f"MRN-{100000 + i}",
                 dob=dob,
                 gender=self.rng.choice(["female", "male", "nonbinary"]),
+                blood_type=self.rng.choices(
+                    list(BLOOD_TYPE_WEIGHTS), weights=list(BLOOD_TYPE_WEIGHTS.values())
+                )[0],
                 phone=self.fake.numerify("555-###-####"),
                 email=self.fake.safe_email(),
                 address_line1=self.fake.street_address(),

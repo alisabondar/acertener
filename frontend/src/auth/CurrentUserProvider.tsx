@@ -4,7 +4,7 @@ import { type ReactNode, useCallback, useMemo, useSyncExternalStore } from "reac
 import { api } from "@/api";
 import { personaStore } from "@/api/persona";
 import { queryKeys, useApiQuery } from "@/api/queries";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AppSkeleton } from "@/components/PageSkeleton";
 
 import { type CurrentUser, CurrentUserContext } from "./context";
 
@@ -52,18 +52,6 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 
   const error = personas.error ?? me.error;
   if (error) throw error;
-  if (!value) return <AppLoading />;
+  if (!value) return <AppSkeleton />;
   return <CurrentUserContext value={value}>{children}</CurrentUserContext>;
-}
-
-function AppLoading() {
-  return (
-    <div aria-busy="true" aria-label="Loading" className="flex min-h-screen bg-background">
-      <div className="w-64 bg-sidebar" />
-      <div className="flex-1 space-y-4 p-8">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-72" />
-      </div>
-    </div>
-  );
 }

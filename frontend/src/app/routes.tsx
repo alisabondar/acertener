@@ -4,10 +4,9 @@ import { CurrentUserProvider } from "@/auth/CurrentUserProvider";
 import { RequirePermission } from "@/auth/RequirePermission";
 import { Home } from "@/pages/Home";
 import { NotFound } from "@/pages/NotFound";
-import { Placeholder } from "@/pages/Placeholder";
 import { RouteError } from "@/pages/RouteError";
 
-import { PatientChart, PatientList } from "./lazyPages";
+import { AuditLog, EditPatient, NewPatient, PatientChart, PatientList } from "./lazyPages";
 import { Shell } from "./Shell";
 
 export const appRoutes: RouteObject[] = [
@@ -33,6 +32,22 @@ export const appRoutes: RouteObject[] = [
             ),
           },
           {
+            path: "patients/new",
+            element: (
+              <RequirePermission permission="CREATE_PATIENT">
+                <NewPatient />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "patients/:patientId/edit",
+            element: (
+              <RequirePermission permission="EDIT_DEMOGRAPHICS">
+                <EditPatient />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "patients/:patientId",
             element: (
               <RequirePermission permission="VIEW_DEMOGRAPHICS">
@@ -44,7 +59,7 @@ export const appRoutes: RouteObject[] = [
             path: "admin/audit",
             element: (
               <RequirePermission permission="VIEW_AUDIT_LOG">
-                <Placeholder title="Audit log" note="Who accessed what, and when." />
+                <AuditLog />
               </RequirePermission>
             ),
           },

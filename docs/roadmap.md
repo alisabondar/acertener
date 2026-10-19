@@ -17,8 +17,6 @@ The items with the most value for clinicians, roughly in order.
 - **Autosave with conflict handling:** debounced saves, a saving indicator, and a prompt when
   someone else changed the record. Edits already carry `base_version`, and a stale save returns
   `409` with the current record.
-- **New patient page and form:** a "New patient" nav entry for providers, nurses, and front desk,
-  with inline validation and the duplicate-patient check (the API supports both).
 
 ## Clinical workflow
 
@@ -37,8 +35,6 @@ The items with the most value for clinicians, roughly in order.
 - **Break-the-glass access:** opening a chart outside your care team asks for a reason, which is
   recorded in the audit trail and flagged for review, so access stays open in an emergency but a
   curiosity lookup is a deliberate, logged act.
-- **Admin audit-log page:** browse and filter the full audit trail in the app (the
-  `GET /admin/audit-log` endpoint already exists).
 - **Login and SSO** behind `current_user`, replacing the persona picker: short-lived server
   sessions, idle and absolute timeouts, and MFA.
 - **Encryption v2:** per-patient keys in a KMS, each value bound to its row, and crypto-shredding.
@@ -72,3 +68,7 @@ The items with the most value for clinicians, roughly in order.
 - **Docker:** one-line setup with `./dev.sh`, the whole stack in Compose.
 - **Validation:** names, MRNs, phone numbers, emails, states, ZIP codes, and addresses are checked
   on the server, with plain-language messages.
+- **Patient form:** create and edit patients (personal, contact, and medical details), checked in
+  the browser and on the server, with duplicate, conflict, and network-failure handling.
+- **Admin audit log:** the practice-wide trail in the app, filterable by person, with field names
+  only.

@@ -19,6 +19,16 @@ async function navLinks() {
 }
 
 describe("demo identity", () => {
+  it("shows the app's layout while it loads: sidebar, header, and cards", async () => {
+    renderApp("/");
+
+    const loading = screen.getByRole("status", { name: "Loading the dashboard" });
+    expect(within(loading).getByTestId("sidebar-skeleton")).toBeInTheDocument();
+    expect(within(loading).getByTestId("header-skeleton")).toBeInTheDocument();
+    expect(within(loading).getAllByTestId("card-skeleton").length).toBeGreaterThanOrEqual(4);
+    await banner();
+  });
+
   it("starts as the first persona the API offers", async () => {
     renderApp("/");
 
@@ -92,10 +102,10 @@ it("explains the problem instead of loading forever when no personas are seeded"
 
 describe("role-aware navigation", () => {
   it.each<[string, Persona, string[]]>([
-    [CHEN.name, CHEN, ["My day", "Patients"]],
-    [RIVERA.name, RIVERA, ["My day", "Patients"]],
-    [OKAFOR.name, OKAFOR, ["My day", "Patients"]],
-    [BROOKS.name, BROOKS, ["My day", "Patients"]],
+    [CHEN.name, CHEN, ["My day", "Patients", "New patient"]],
+    [RIVERA.name, RIVERA, ["My day", "Patients", "New patient"]],
+    [OKAFOR.name, OKAFOR, ["My day", "Patients", "New patient"]],
+    [BROOKS.name, BROOKS, ["My day", "Patients", "New patient"]],
     [ADMIN.name, ADMIN, ["Patients", "Admin"]],
   ])("shows %s only the sections their role can use", async (_name, persona, expected) => {
     renderApp("/patients", { persona });

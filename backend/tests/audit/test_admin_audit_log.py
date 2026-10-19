@@ -42,6 +42,7 @@ async def test_admin_sees_newest_first_with_field_names_but_no_values(
     items = response.json()["items"]
     assert [i["patient_id"] for i in items] == [str(second), str(first)]
     assert items[0]["changed_fields"] == ["city", "phone"]
+    assert (items[0]["actor_name"], items[0]["actor_role"]) == (nurse.name, "nurse")
     assert CANARY not in response.text
 
 

@@ -95,6 +95,8 @@ class PatientDetail(BaseModel):
     city: str | None
     state: str | None
     postal_code: str | None
+    # Clinical, so only for roles that may view clinical data; null for everyone else.
+    blood_type: str | None
     status: PatientStatus
     last_visit_at: datetime | None
     archived: bool
@@ -125,12 +127,13 @@ class FilterCountsOut(BaseModel):
 
 
 Gender = Literal["female", "male", "nonbinary", "other", "unknown"]
+BloodType = Literal["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
 
 # Letters in any script, joined by single spaces, hyphens, or apostrophes (straight or curly),
 # each part optionally ending in a period: "O'Neil", "Mary-Jane", "Nguyễn", "St. John",
 # "Smith Jr.". No digits or symbols.
 _NAME = re.compile(r"[^\W\d_]+\.?(?:[ '\u2019-][^\W\d_]+\.?)*")
-_MRN = re.compile(r"(?=.*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
+_MRN = re.compile(r"(?:MRN-)?(\d{1,12})", re.IGNORECASE)
 _EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
 _POSTAL_CODE = re.compile(r"\d{5}(?:-\d{4})?")
 _HAS_LETTER_OR_DIGIT = re.compile(r"[^\W_]")
@@ -208,11 +211,11 @@ def _check_name(value: str) -> str:
 
 
 def _check_mrn(value: str) -> str:
-    if not _MRN.fullmatch(value):
-        raise ValueError(
-            "Use letters and digits, optionally separated by hyphens (e.g. MRN-100234)"
-        )
-    return value
+    """The practice's MRNs are numbers: accept "100234" or "MRN-100234", store "MRN-100234"."""
+    match = _MRN.fullmatch(value)
+    if not match:
+        raise ValueError("Enter the MRN's digits, e.g. 100234")
+    return f"MRN-{match.group(1)}"
 
 
 def _check_phone(value: str) -> str:
@@ -300,9 +303,21 @@ class PatientFields(BaseModel):
     city: City | None = None
     state: State | None = None
     postal_code: PostalCode | None = None
+    blood_type: BloodType | None = None
+
+
+class PatientReplace(PatientFields):
+    """A full replacement (PUT): optional fields that aren't sent are cleared."""
+
+    base_version: int
 
 
 class PatientCreate(PatientFields):
+    """Registration: besides name, DOB, and MRN, administrative sex and a phone number to reach
+    the patient are required, as in most practice registration workflows."""
+
+    gender: Gender
+    phone: Phone
     confirm_not_duplicate: bool = False
 
 
@@ -323,6 +338,7 @@ class PatientChanges(BaseModel):
     city: City | None = None
     state: State | None = None
     postal_code: PostalCode | None = None
+    blood_type: BloodType | None = None
 
     @field_validator("first_name", "last_name", "mrn", "dob", mode="before")
     @classmethod

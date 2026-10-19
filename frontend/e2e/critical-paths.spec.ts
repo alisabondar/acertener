@@ -9,7 +9,7 @@ test("starts as Dr. Chen, and switching persona changes what the app offers", as
   await openApp(page);
   await expect(identity(page)).toContainText("Viewing as Dr. Wei Chen (Provider, MD)");
   const nav = page.getByRole("navigation", { name: "Main" });
-  await expect(nav.getByRole("link")).toHaveText(["My day", "Patients"]);
+  await expect(nav.getByRole("link")).toHaveText(["My day", "Patients", "New patient"]);
 
   await viewAs(page, "Practice Admin");
 
