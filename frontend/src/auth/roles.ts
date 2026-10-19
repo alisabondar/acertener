@@ -19,3 +19,8 @@ export function initials(name: string): string {
     .map((word) => word[0]?.toUpperCase() ?? "")
     .join("");
 }
+
+/** Providers and nurses work from a care team. */
+export function hasCareTeam(role: string): boolean {
+  return role === "provider" || role === "nurse";
+}

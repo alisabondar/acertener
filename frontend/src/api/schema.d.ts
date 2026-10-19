@@ -490,6 +490,11 @@ export interface components {
       age: number;
       /** Archived */
       archived: boolean;
+      /**
+       * Dob
+       * Format: date
+       */
+      dob: string;
       /** First Name */
       first_name: string;
       /**

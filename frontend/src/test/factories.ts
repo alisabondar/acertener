@@ -48,6 +48,46 @@ export function makeMe(persona: Persona = CHEN): Schemas["MeOut"] {
   return { ...persona, permissions: ROLE_PERMISSIONS[persona.role] ?? [] };
 }
 
+export type PatientListItem = Schemas["PatientListItem"];
+
+let patientSeq = 0;
+
+export function makePatient(overrides: Partial<PatientListItem> = {}): PatientListItem {
+  patientSeq += 1;
+  return {
+    id: `11111111-1111-4111-8111-${String(patientSeq).padStart(12, "0")}`,
+    first_name: "Daniel",
+    last_name: "Osei",
+    mrn: `MRN-${100000 + patientSeq}`,
+    dob: "1963-04-02",
+    age: 63,
+    status: "active",
+    last_visit_at: "2026-05-18T14:00:00Z",
+    archived: false,
+    on_my_care_team: true,
+    inactivity_suggested: false,
+    ...overrides,
+  };
+}
+
+export function makePage(
+  items: PatientListItem[],
+  { total = items.length, page = 1, page_size = 20 } = {},
+): Schemas["PatientPage"] {
+  return { items, total, page, page_size };
+}
+
+export function makeCounts(
+  overrides: Partial<Schemas["FilterCountsOut"]> = {},
+): Schemas["FilterCountsOut"] {
+  return {
+    today_visits: 4,
+    status: { active: 120, inactive: 30, deceased: 2 },
+    archived: 5,
+    ...overrides,
+  };
+}
+
 export function makeProblem(
   status: number,
   code: string,

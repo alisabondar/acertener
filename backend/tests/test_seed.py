@@ -146,6 +146,29 @@ async def test_seeding_twice_adds_nothing(
 
 @pytest.mark.db
 @pytest.mark.anyio
+async def test_seed_has_a_realistic_status_mix(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    count = 1000
+    await seed(db_session, field_cipher, count=count, today=TODAY)
+    patients = list(await db_session.scalars(select(Patient)))
+    three_years_ago = datetime.combine(TODAY.replace(year=TODAY.year - 3), time(), tzinfo=UTC)
+
+    def share(predicate: Any) -> float:
+        return sum(1 for p in patients if predicate(p)) / count
+
+    assert 0.01 <= share(lambda p: p.status == "deceased") <= 0.06
+    assert 0.08 <= share(lambda p: p.status == "inactive") <= 0.18
+    assert (
+        0.02 <= share(lambda p: p.status == "active" and p.last_visit_at < three_years_ago) <= 0.09
+    )
+    archived = [p for p in patients if p.archived_at is not None]
+    assert archived
+    assert all(p.status != "active" for p in archived)
+
+
+@pytest.mark.db
+@pytest.mark.anyio
 async def test_seed_works_on_a_leap_day(
     db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:

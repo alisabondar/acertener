@@ -4,6 +4,7 @@ import type { components, paths } from "./schema";
 
 type PatientListParams = NonNullable<paths["/api/v1/patients"]["get"]["parameters"]["query"]>;
 type Scope = components["schemas"]["Scope"];
+type SearchTerms = components["schemas"]["SearchTerms"];
 
 /**
  * Query keys, grouped so a whole area can be invalidated at once
@@ -15,6 +16,9 @@ export const queryKeys = {
   patients: {
     all: ["patients"] as const,
     list: (params: PatientListParams) => ["patients", "list", params] as const,
+    /** Identifying terms live only in this in-memory key and the request body, never the URL. */
+    search: (params: PatientListParams, terms: SearchTerms) =>
+      ["patients", "search", params, terms] as const,
     counts: (scope: Scope) => ["patients", "counts", scope] as const,
     detail: (id: string) => ["patients", "detail", id] as const,
   },
@@ -41,10 +45,15 @@ export function useApiQuery<T>(
     queryKey,
     enabled,
     placeholderData: (previous) => (keepPrevious ? previous : undefined),
-    queryFn: async ({ signal }) => {
-      const { data } = await call(signal);
-      if (data === undefined) throw new Error("The API returned no data");
-      return data;
-    },
+    queryFn: apiQueryFn(call),
   });
+}
+
+/** A TanStack query function over an openapi-fetch call; also usable for prefetching. */
+export function apiQueryFn<T>(call: (signal: AbortSignal) => Promise<{ data?: T }>) {
+  return async ({ signal }: { signal: AbortSignal }): Promise<T> => {
+    const { data } = await call(signal);
+    if (data === undefined) throw new Error("The API returned no data");
+    return data;
+  };
 }

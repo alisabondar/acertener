@@ -41,6 +41,8 @@ SEED = 20261017
 DEFAULT_COUNT = 10_000
 BATCH_SIZE = 1_000
 TODAYS_VISITS = 16
+# Of inactive and deceased patients, the share an administrator has archived.
+ARCHIVED_SHARE_OF_CLOSED = 0.2
 
 
 EXTRA_STAFF = [("provider", "MD"), ("provider", "PA"), ("nurse", "RN"), ("nurse", "MA")]
@@ -109,6 +111,21 @@ class _Seeder:
         # Rows waiting to be written, by stage: each stage only references earlier ones.
         self.stages: list[list[Base]] = [[], [], []]
 
+    def _panel_mix(self) -> tuple[list[int], str]:
+        """Visit history (days ago) and status for a typical primary-care panel."""
+        roll = self.rng.random()
+        if roll < 0.03:
+            return self._visits(200, 2000), "deceased"
+        if roll < 0.15:
+            return self._visits(1100, 3000), "inactive"
+        if roll < 0.20:
+            # Still active on paper but unseen for 3+ years: the list suggests inactivity.
+            return self._visits(1100, 1800), "active"
+        return self._visits(14, 900), "active"
+
+    def _visits(self, newest: int, oldest: int) -> list[int]:
+        return sorted(self.rng.sample(range(newest, oldest), k=self.rng.randint(1, 4)))
+
     def _uuid(self) -> uuid.UUID:
         return uuid.UUID(int=self.rng.getrandbits(128), version=4)
 
@@ -142,6 +159,7 @@ class _Seeder:
         by_email = {u.email: u for u in people}
         self.chen, self.rivera = by_email["chen@demo.clinic"], by_email["rivera@demo.clinic"]
         self.okafor = by_email["okafor@demo.clinic"]
+        self.admin = by_email["admin@demo.clinic"]
         extra = people[len(PERSONAS) :]
         # Personas get most patients so their "My patients" and "My day" views are full.
         self.primary_rotation = [self.chen, self.rivera, self.chen, self.rivera] + [
@@ -188,7 +206,12 @@ class _Seeder:
         elif special == 3:
             visit_days = [1460]
         else:
-            visit_days = sorted(self.rng.sample(range(14, 900), k=self.rng.randint(1, 4)))
+            visit_days, patient.status = self._panel_mix()
+        if patient.status != "active" and self.rng.random() < ARCHIVED_SHARE_OF_CLOSED:
+            patient.archived_at = datetime.combine(
+                self.today - timedelta(days=self.rng.randint(30, 365)), time(9), tzinfo=self.tz
+            )
+            patient.archived_by = self.admin.id
 
         completed = [
             self._past_visit(
@@ -202,7 +225,12 @@ class _Seeder:
             for d in visit_days
         ]
         # A realistic day: a handful of today's visits for the persona providers.
-        if primary in (self.chen, self.rivera) and i < min(count * 3 // 5, TODAYS_VISITS):
+        if (
+            primary in (self.chen, self.rivera)
+            and patient.status == "active"
+            and min(visit_days) < 900
+            and i < min(count * 3 // 5, TODAYS_VISITS)
+        ):
             self.stages[1].append(
                 Visit(
                     patient_id=patient.id,

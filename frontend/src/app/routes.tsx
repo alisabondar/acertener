@@ -3,6 +3,7 @@ import type { RouteObject } from "react-router";
 import { CurrentUserProvider } from "@/auth/CurrentUserProvider";
 import { RequirePermission } from "@/auth/RequirePermission";
 import { Home } from "@/pages/Home";
+import { PatientList } from "@/patients/PatientList";
 import { NotFound } from "@/pages/NotFound";
 import { Placeholder } from "@/pages/Placeholder";
 import { RouteError } from "@/pages/RouteError";
@@ -27,7 +28,7 @@ export const appRoutes: RouteObject[] = [
             path: "patients",
             element: (
               <RequirePermission permission="VIEW_DEMOGRAPHICS">
-                <Placeholder title="Patients" note="Search and browse patients." />
+                <PatientList />
               </RequirePermission>
             ),
           },

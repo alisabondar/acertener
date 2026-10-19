@@ -68,7 +68,7 @@
   --muted-foreground: #64748b;
   --accent: #e2e8f0;
   --accent-foreground: #0f172a;
-  --destructive: #dc2626;
+  --destructive: #b91c1c;
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #2563eb;
@@ -77,10 +77,10 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --status-active: #16a34a;
-  --status-inactive: #d97706;
-  --status-deceased: #6b7280;
-  --severe: #dc2626;
+  --status-active: #15803d;
+  --status-inactive: #92400e;
+  --status-deceased: #4b5563;
+  --severe: #b91c1c;
   --radius: 0.625rem;
   --sidebar: #1e293b;
   --sidebar-foreground: #cbd5e1;
