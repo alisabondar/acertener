@@ -30,4 +30,17 @@ export const handlers = [
     HttpResponse.json(makeDetail({ id: String(params["patientId"]) })),
   ),
   http.get("/api/v1/patients/:patientId/allergies", () => HttpResponse.json({ items: [] })),
+  http.get("/api/v1/patients/:patientId/conditions", () => HttpResponse.json({ items: [] })),
+  http.get("/api/v1/patients/:patientId/summary", () =>
+    HttpResponse.json({
+      header: { allergies: [], conditions: [] },
+      status: "fresh",
+      narrative: "A summary of the chart.",
+      is_ai_generated: true,
+      provider: "Mock AI",
+      generated_at: new Date().toISOString(),
+      next_refresh_at: null,
+      error_code: null,
+    }),
+  ),
 ];

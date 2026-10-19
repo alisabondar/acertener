@@ -621,6 +621,27 @@
         "title": "ItemsOut[VitalsOut]",
         "type": "object"
       },
+      "LeakCheckOut": {
+        "properties": {
+          "detectors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Detectors",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "detectors"
+        ],
+        "title": "LeakCheckOut",
+        "type": "object"
+      },
       "MeOut": {
         "properties": {
           "credential": {
@@ -1406,6 +1427,29 @@
         "title": "PatientUpdate",
         "type": "object"
       },
+      "PayloadPreview": {
+        "properties": {
+          "leak_check": {
+            "$ref": "#/components/schemas/LeakCheckOut"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payload",
+          "leak_check",
+          "provider"
+        ],
+        "title": "PayloadPreview",
+        "type": "object"
+      },
       "Permission": {
         "enum": [
           "VIEW_DEMOGRAPHICS",
@@ -1599,6 +1643,170 @@
           "status"
         ],
         "title": "StatusChangeIn",
+        "type": "object"
+      },
+      "SummaryAllergy": {
+        "properties": {
+          "severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "mild",
+                  "moderate",
+                  "severe"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "substance": {
+            "title": "Substance",
+            "type": "string"
+          }
+        },
+        "required": [
+          "substance",
+          "severity"
+        ],
+        "title": "SummaryAllergy",
+        "type": "object"
+      },
+      "SummaryCondition": {
+        "properties": {
+          "icd10_code": {
+            "title": "Icd10 Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "icd10_code",
+          "name"
+        ],
+        "title": "SummaryCondition",
+        "type": "object"
+      },
+      "SummaryHeader": {
+        "description": "Straight from the chart, never from the AI, so it's always available and exact.",
+        "properties": {
+          "allergies": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryAllergy"
+            },
+            "title": "Allergies",
+            "type": "array"
+          },
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryCondition"
+            },
+            "title": "Conditions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "allergies",
+          "conditions"
+        ],
+        "title": "SummaryHeader",
+        "type": "object"
+      },
+      "SummaryOut": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "header": {
+            "$ref": "#/components/schemas/SummaryHeader"
+          },
+          "is_ai_generated": {
+            "title": "Is Ai Generated",
+            "type": "boolean"
+          },
+          "narrative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narrative"
+          },
+          "next_refresh_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Refresh At"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "status": {
+            "enum": [
+              "fresh",
+              "stale",
+              "generating",
+              "failed",
+              "blocked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "header",
+          "status",
+          "narrative",
+          "is_ai_generated",
+          "provider",
+          "generated_at",
+          "next_refresh_at",
+          "error_code"
+        ],
+        "title": "SummaryOut",
         "type": "object"
       },
       "TodaysVisits": {
@@ -2433,6 +2641,66 @@
         "summary": "Change Condition Status",
         "tags": [
           "clinical"
+        ]
+      }
+    },
+    "/api/v1/dev/patients/{patient_id}/ai-payload": {
+      "get": {
+        "description": "Exactly what would be sent to the AI, and the leak check's verdict, without sending it.",
+        "operationId": "preview_payload_api_v1_dev_patients__patient_id__ai_payload_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Persona",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Persona"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayloadPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Payload",
+        "tags": [
+          "summary"
         ]
       }
     },
@@ -3821,6 +4089,124 @@
         "summary": "Change Status",
         "tags": [
           "patients"
+        ]
+      }
+    },
+    "/api/v1/patients/{patient_id}/summary": {
+      "get": {
+        "operationId": "get_summary_api_v1_patients__patient_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Persona",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Persona"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Summary",
+        "tags": [
+          "summary"
+        ]
+      }
+    },
+    "/api/v1/patients/{patient_id}/summary/refresh": {
+      "post": {
+        "operationId": "refresh_summary_api_v1_patients__patient_id__summary_refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Persona",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Persona"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Summary",
+        "tags": [
+          "summary"
         ]
       }
     },

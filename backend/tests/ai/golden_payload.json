@@ -1,0 +1,37 @@
+{
+  "age": "70",
+  "conditions": [
+    {
+      "icd10_code": "I10",
+      "name": "Essential hypertension",
+      "status": "active"
+    }
+  ],
+  "notes": [
+    {
+      "day_offset": -7,
+      "text": "[PATIENT] seen with [CLINICIAN]. Cough since [DATE -17d]. Call [REDACTED]."
+    }
+  ],
+  "sex": "female",
+  "visits": [
+    {
+      "day_offset": -7,
+      "reason": "Cough and congestion",
+      "status": "completed"
+    }
+  ],
+  "vitals": [
+    {
+      "bp_diastolic": 88,
+      "bp_systolic": 142,
+      "day_offset": -7,
+      "heart_rate": 76,
+      "height_cm": null,
+      "respiratory_rate": null,
+      "spo2": 98,
+      "temperature_c": "37.1",
+      "weight_kg": null
+    }
+  ]
+}

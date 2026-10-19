@@ -407,9 +407,7 @@ async def test_allergy_severity_must_be_known(
 # --- Summary & audit --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "action", ["write a note", "record vitals", "add an allergy", "add a condition"]
-)
+@pytest.mark.parametrize("action", ["record vitals", "add an allergy", "add a condition"])
 async def test_every_clinical_write_marks_the_summary_stale(
     api: Api, db_session: AsyncSession, patient: Patient, action: str
 ) -> None:

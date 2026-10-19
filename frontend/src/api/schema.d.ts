@@ -109,6 +109,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/dev/patients/{patient_id}/ai-payload": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Preview Payload
+     * @description Exactly what would be sent to the AI, and the leak check's verdict, without sending it.
+     */
+    get: operations["preview_payload_api_v1_dev_patients__patient_id__ai_payload_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/notes/{note_id}": {
     parameters: {
       query?: never;
@@ -345,6 +365,40 @@ export interface paths {
     put?: never;
     /** Change Status */
     post: operations["change_status_api_v1_patients__patient_id__status_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/patients/{patient_id}/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Summary */
+    get: operations["get_summary_api_v1_patients__patient_id__summary_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/patients/{patient_id}/summary/refresh": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Refresh Summary */
+    post: operations["refresh_summary_api_v1_patients__patient_id__summary_refresh_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -658,6 +712,13 @@ export interface components {
       /** Items */
       items: components["schemas"]["VitalsOut"][];
     };
+    /** LeakCheckOut */
+    LeakCheckOut: {
+      /** Detectors */
+      detectors: string[];
+      /** Ok */
+      ok: boolean;
+    };
     /** MeOut */
     MeOut: {
       /** Credential */
@@ -908,6 +969,16 @@ export interface components {
       base_version: number;
       changes: components["schemas"]["PatientChanges"];
     };
+    /** PayloadPreview */
+    PayloadPreview: {
+      leak_check: components["schemas"]["LeakCheckOut"];
+      /** Payload */
+      payload: {
+        [key: string]: unknown;
+      };
+      /** Provider */
+      provider: string;
+    };
     /**
      * Permission
      * @enum {string}
@@ -996,6 +1067,51 @@ export interface components {
        * @enum {string}
        */
       status: "active" | "resolved" | "entered_in_error";
+    };
+    /** SummaryAllergy */
+    SummaryAllergy: {
+      /** Severity */
+      severity: ("mild" | "moderate" | "severe") | null;
+      /** Substance */
+      substance: string;
+    };
+    /** SummaryCondition */
+    SummaryCondition: {
+      /** Icd10 Code */
+      icd10_code: string;
+      /** Name */
+      name: string;
+    };
+    /**
+     * SummaryHeader
+     * @description Straight from the chart, never from the AI, so it's always available and exact.
+     */
+    SummaryHeader: {
+      /** Allergies */
+      allergies: components["schemas"]["SummaryAllergy"][];
+      /** Conditions */
+      conditions: components["schemas"]["SummaryCondition"][];
+    };
+    /** SummaryOut */
+    SummaryOut: {
+      /** Error Code */
+      error_code: string | null;
+      /** Generated At */
+      generated_at: string | null;
+      header: components["schemas"]["SummaryHeader"];
+      /** Is Ai Generated */
+      is_ai_generated: boolean;
+      /** Narrative */
+      narrative: string | null;
+      /** Next Refresh At */
+      next_refresh_at: string | null;
+      /** Provider */
+      provider: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "fresh" | "stale" | "generating" | "failed" | "blocked";
     };
     /** TodaysVisits */
     TodaysVisits: {
@@ -1318,6 +1434,39 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ConditionOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  preview_payload_api_v1_dev_patients__patient_id__ai_payload_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Persona"?: string | null;
+      };
+      path: {
+        patient_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PayloadPreview"];
         };
       };
       /** @description Validation Error */
@@ -1998,6 +2147,72 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PatientDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_summary_api_v1_patients__patient_id__summary_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Persona"?: string | null;
+      };
+      path: {
+        patient_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SummaryOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  refresh_summary_api_v1_patients__patient_id__summary_refresh_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-Persona"?: string | null;
+      };
+      path: {
+        patient_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SummaryOut"];
         };
       };
       /** @description Validation Error */

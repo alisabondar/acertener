@@ -9,6 +9,7 @@ from app.audit import Audit, AuditAction, AuditEntry, get_audit
 from app.auth.permissions import Permission, has_permission, require
 from app.db.models import User
 from app.db.session import get_session
+from app.demo.schedule import keep_schedule_current
 from app.patients.derived import age_on
 from app.patients.queries import practice_today
 from app.schemas.patients import Scope
@@ -31,6 +32,9 @@ async def today(
     """Today's schedule at the practice, for the "My day" home page."""
     tz = ZoneInfo(request.app.state.settings.practice_timezone)
     day = practice_today(datetime.now(UTC), tz)
+    if request.app.state.settings.demo_mode:
+        # Demo data follows the calendar, so a demo left running overnight isn't empty.
+        await keep_schedule_current(session, day, tz)
     clinical = has_permission(user, Permission.VIEW_CLINICAL)
     rows = await todays_visits(session, user, scope, day, tz)
     audit.record_read(AuditEntry(AuditAction.VIEW, "todays_visits"))

@@ -34,8 +34,10 @@ export const queryKeys = {
     counts: (scope: Scope) => ["patients", "counts", scope] as const,
     detail: (id: string) => ["patients", "detail", id] as const,
     /** One part of a chart; `chart(id)` alone matches every part, for invalidating after writes. */
-    chart: (id: string, part?: "notes" | "vitals" | "allergies" | "conditions" | "access") =>
-      part ? (["patients", "chart", id, part] as const) : (["patients", "chart", id] as const),
+    chart: (
+      id: string,
+      part?: "notes" | "vitals" | "allergies" | "conditions" | "access" | "summary",
+    ) => (part ? (["patients", "chart", id, part] as const) : (["patients", "chart", id] as const)),
   },
 };
 
@@ -53,8 +55,11 @@ export function useApiQuery<T>(
     refetchInterval,
   }: {
     enabled?: boolean;
-    /** Re-fetch this often (ms) while the page is open, for data other people change. */
-    refetchInterval?: number;
+    /**
+     * Re-fetch this often (ms) while the page is open, for data other people change; a function
+     * picks the next interval from the latest data (`false` stops polling).
+     */
+    refetchInterval?: number | ((data: T | undefined) => number | false);
     /** While a new key loads, keep returning the previous key's data (isPlaceholderData). */
     keepPrevious?: boolean;
   } = {},
@@ -62,7 +67,12 @@ export function useApiQuery<T>(
   return useQuery<T>({
     queryKey,
     enabled,
-    ...(refetchInterval !== undefined && { refetchInterval }),
+    ...(refetchInterval !== undefined && {
+      refetchInterval:
+        typeof refetchInterval === "function"
+          ? (query: { state: { data: T | undefined } }) => refetchInterval(query.state.data)
+          : refetchInterval,
+    }),
     placeholderData: (previous) => (keepPrevious ? previous : undefined),
     queryFn: apiQueryFn(call),
   });

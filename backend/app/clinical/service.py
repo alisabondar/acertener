@@ -67,9 +67,13 @@ class ClinicalService:
         entity_id: uuid.UUID,
         patient_id: uuid.UUID,
         changes: Mapping[str, tuple[object, object]] | None = None,
+        *,
+        affects_summary: bool = True,
     ) -> None:
         await self._audit.record_change(AuditEntry(action, entity, entity_id, patient_id, changes))
-        await mark_summary_stale(self._session, patient_id)
+        # Drafts never reach the AI, so only changes to what it sees make the summary stale.
+        if affects_summary:
+            await mark_summary_stale(self._session, patient_id)
 
     # --- Notes ------------------------------------------------------------------------------
 
@@ -107,7 +111,12 @@ class ClinicalService:
             await self._session.flush()
             # Note text is PHI-rich; the audit trail records that it changed, not what it says.
             await self._record(
-                AuditAction.CREATE, "note", note.id, patient_id, {"status": (None, "draft")}
+                AuditAction.CREATE,
+                "note",
+                note.id,
+                patient_id,
+                {"status": (None, "draft")},
+                affects_summary=False,
             )
         return await self._reload(note)
 
@@ -122,6 +131,7 @@ class ClinicalService:
                 note.id,
                 note.patient_id,
                 {"content_length": (old_length, len(content))},
+                affects_summary=False,
             )
         return await self._reload(note)
 
@@ -147,7 +157,9 @@ class ClinicalService:
         async with transaction(self._session):
             note.deleted_at = datetime.now(UTC)
             note.deleted_by = self._user.id
-            await self._record(AuditAction.DELETE, "note", note.id, note.patient_id)
+            await self._record(
+                AuditAction.DELETE, "note", note.id, note.patient_id, affects_summary=False
+            )
 
     async def _own_draft(self, note_id: uuid.UUID) -> Note:
         note = await self._session.get(Note, note_id)

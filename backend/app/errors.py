@@ -33,6 +33,7 @@ class ErrorCode(Enum):
         HTTPStatus.CONFLICT,
         "That action doesn't apply to the record's current state.",
     )
+    RATE_LIMITED = (HTTPStatus.TOO_MANY_REQUESTS, "Too many requests; try again shortly.")
     INTERNAL_ERROR = (HTTPStatus.INTERNAL_SERVER_ERROR, "Something went wrong on our side.")
     SERVICE_UNAVAILABLE = (HTTPStatus.SERVICE_UNAVAILABLE, "A dependency is unavailable.")
 
@@ -52,6 +53,10 @@ class AppError(Exception):
         # Extra Problem Details members (RFC 9457 allows them). Never PHI.
         self.extensions = extensions
         super().__init__(self.code.name)
+
+    def response_headers(self) -> dict[str, str]:
+        """HTTP headers to send with this error; subclasses add per-instance ones."""
+        return dict(self.headers)
 
 
 class NotFoundError(AppError):
@@ -106,3 +111,14 @@ class NotNoteAuthorError(AppError):
 
 class NoteFinalizedError(AppError):
     code = ErrorCode.NOTE_FINALIZED
+
+
+class RateLimitedError(AppError):
+    code = ErrorCode.RATE_LIMITED
+
+    def __init__(self, retry_after: int) -> None:
+        super().__init__(retry_after=retry_after)
+        self.retry_after = retry_after
+
+    def response_headers(self) -> dict[str, str]:
+        return {**super().response_headers(), "Retry-After": str(self.retry_after)}

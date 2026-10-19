@@ -1,8 +1,8 @@
-import { Sparkles } from "lucide-react";
 import { Panel } from "@/components/Fields";
 import { cn } from "@/lib/utils";
 
 import { useChartAllergies, useChartConditions } from "./chartData";
+import { SummaryCard } from "./SummaryCard";
 
 /** The clinical picture first: the AI summary, then what's active. */
 export function OverviewTab({ patientId }: { patientId: string }) {
@@ -13,12 +13,7 @@ export function OverviewTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-4">
-      <Panel title="AI summary">
-        <p className="flex items-center gap-2 text-[14px] text-muted-foreground">
-          <Sparkles className="size-4 text-brand" aria-hidden /> A de-identified AI summary arrives
-          here soon.
-        </p>
-      </Panel>
+      <SummaryCard patientId={patientId} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Active problems">
           <Items
