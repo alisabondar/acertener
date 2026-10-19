@@ -8,7 +8,8 @@ import { ADMIN, BROOKS, CHEN, makeProblem, OKAFOR, type Persona, RIVERA } from "
 import { server } from "@/test/msw/server";
 import { renderApp } from "@/test/render";
 
-const banner = () => screen.findByRole("status", { name: "Demo identity" });
+/** The one identity control: shows who you are and opens the "View as" menu. */
+const banner = () => screen.findByRole("button", { name: /^(Viewing as|Switching to)/ });
 
 async function navLinks() {
   const nav = await screen.findByRole("navigation", { name: "Main" });
@@ -21,7 +22,9 @@ describe("demo identity", () => {
   it("starts as the first persona the API offers", async () => {
     renderApp("/");
 
-    expect(await banner()).toHaveTextContent("Viewing as Dr. Wei Chen (Provider, MD)");
+    const identity = await banner();
+    expect(identity).toHaveTextContent("Viewing as Dr. Wei Chen (Provider, MD)");
+    expect(document.body).not.toHaveTextContent(/demo mode/i);
   });
 
   it("switches persona from the banner and drops everything cached as the previous one", async () => {
@@ -30,7 +33,7 @@ describe("demo identity", () => {
     await banner();
     expect(queryClient.getQueryData(queryKeys.me(CHEN.id))).toBeDefined();
 
-    await user.click(screen.getByRole("button", { name: "Switch" }));
+    await user.click(await banner());
     await user.click(await screen.findByRole("menuitemradio", { name: /Sam Okafor/ }));
 
     expect(await banner()).toHaveTextContent("Viewing as Sam Okafor (Nurse, RN)");
@@ -48,7 +51,7 @@ describe("demo identity", () => {
     renderApp("/");
     await banner();
 
-    await user.click(screen.getByRole("button", { name: "Switch" }));
+    await user.click(await banner());
     await user.click(await screen.findByRole("menuitemradio", { name: /Sam Okafor/ }));
 
     expect(await banner()).toHaveTextContent("Switching to Sam Okafor");

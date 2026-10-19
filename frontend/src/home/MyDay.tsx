@@ -7,22 +7,18 @@ import { queryKeys, useApiQuery } from "@/api/queries";
 import type { components } from "@/api/schema";
 import { useCurrentUser } from "@/auth/context";
 import { hasCareTeam } from "@/auth/roles";
+import { SectionTitle } from "@/components/Fields";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNow } from "@/hooks/useNow";
 import { formatDob } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { EmptyState, ListError } from "@/patients/ListStates";
-import { patientListQuery } from "@/patients/patientListQuery";
-import { PatientSearchFields } from "@/patients/PatientSearchFields";
 import { ScopeToggle } from "@/patients/ScopeToggle";
-import { DEFAULT_LIST_PARAMS } from "@/patients/usePatientListParams";
-import { usePatientSearch } from "@/patients/usePatientSearch";
 
 type Visit = components["schemas"]["ScheduledVisitOut"];
 type VisitStatus = Visit["status"];
 type Scope = components["schemas"]["Scope"];
 
-const LOOKUP_RESULTS = 5;
 const SCHEDULE_REFRESH_MS = 60_000;
 
 const STATUS: Record<VisitStatus, { label: string; style: string }> = {
@@ -74,30 +70,23 @@ export function MyDay() {
 
       <AtAGlance visits={day.data?.items} />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="space-y-3">
-          <h2 className="text-[17px] font-semibold">Today's schedule</h2>
-          {day.data ? (
-            day.data.items.length > 0 ? (
-              <Schedule visits={day.data.items} now={now} showProvider={scope === "all"} />
-            ) : (
-              <EmptyState message="No visits scheduled today" />
-            )
-          ) : day.error ? (
-            <ListError
-              error={day.error}
-              what="today's schedule"
-              onRetry={() => void day.refetch()}
-            />
+      <div className="space-y-3">
+        <SectionTitle>Today's schedule</SectionTitle>
+        {day.data ? (
+          day.data.items.length > 0 ? (
+            <Schedule visits={day.data.items} now={now} showProvider={scope === "all"} />
           ) : (
-            <div role="status" aria-label="Loading today's schedule" className="space-y-2">
-              {Array.from({ length: 5 }, (_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-xl" />
-              ))}
-            </div>
-          )}
-        </div>
-        <PatientLookup />
+            <EmptyState message="No visits scheduled today" />
+          )
+        ) : day.error ? (
+          <ListError error={day.error} what="today's schedule" onRetry={() => void day.refetch()} />
+        ) : (
+          <div role="status" aria-label="Loading today's schedule" className="space-y-2">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-xl" />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -109,7 +98,7 @@ function AtAGlance({ visits }: { visits: Visit[] | undefined }) {
     <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Stat label="Today's visits" value={visits?.length} />
       <Stat label="Checked in" value={count("checked_in")} />
-      <Stat label="Still to come" value={count("scheduled")} />
+      <Stat label="Completed" value={count("completed")} />
       <Stat label="No-shows" value={count("no_show")} />
     </section>
   );
@@ -118,8 +107,12 @@ function AtAGlance({ visits }: { visits: Visit[] | undefined }) {
 function Stat({ label, value }: { label: string; value: number | undefined }) {
   return (
     <div className="rounded-xl border bg-card px-4 py-3">
-      <span className="block text-[13px] text-muted-foreground">{label}</span>{" "}
-      <span className="block text-[28px] font-semibold tabular-nums">{value ?? "–"}</span>
+      <span className="block text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </span>{" "}
+      <span className="block text-[28px] font-semibold text-brand tabular-nums">
+        {value ?? "–"}
+      </span>
     </div>
   );
 }
@@ -161,70 +154,35 @@ function NowLine({ now }: { now: Date }) {
 function VisitRow({ visit, showProvider }: { visit: Visit; showProvider: boolean }) {
   const { patient } = visit;
   const status = STATUS[visit.status];
+  // The whole card opens the chart: a bigger target than a name, and one stop per visit.
   return (
-    <li className="flex items-center gap-4 rounded-xl border bg-card px-4 py-3">
-      <time
-        dateTime={visit.scheduled_at}
-        className="w-20 shrink-0 font-medium whitespace-nowrap tabular-nums"
+    <li>
+      <Link
+        to={`/patients/${patient.id}`}
+        className="flex items-center gap-4 rounded-xl border bg-card px-4 py-3 transition-colors hover:border-brand/50 hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring"
       >
-        {format(parseISO(visit.scheduled_at), "h:mm a")}
-      </time>
-      <div className="min-w-0 flex-1">
-        <Link to={`/patients/${patient.id}`} className="font-medium hover:underline">
-          {patient.last_name}, {patient.first_name}
-        </Link>
-        <p className="text-[12px] text-muted-foreground tabular-nums">
-          {formatDob(patient.dob)} ({patient.age}y) · {patient.mrn}
-          {showProvider && ` · ${visit.provider_name}`}
-        </p>
-        {visit.reason && <p className="truncate text-[13px]">{visit.reason}</p>}
-      </div>
-      <span
-        className={cn("shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium", status.style)}
-      >
-        {status.label}
-      </span>
+        <time
+          dateTime={visit.scheduled_at}
+          className="w-20 shrink-0 font-semibold whitespace-nowrap text-brand tabular-nums"
+        >
+          {format(parseISO(visit.scheduled_at), "h:mm a")}
+        </time>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold">
+            {patient.last_name}, {patient.first_name}
+          </p>
+          <p className="text-[12px] text-muted-foreground tabular-nums">
+            {formatDob(patient.dob)} ({patient.age}y) · {patient.mrn}
+            {showProvider && ` · ${visit.provider_name}`}
+          </p>
+          {visit.reason && <p className="truncate text-[13px] text-foreground">{visit.reason}</p>}
+        </div>
+        <span
+          className={cn("shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium", status.style)}
+        >
+          {status.label}
+        </span>
+      </Link>
     </li>
-  );
-}
-
-/** Find any patient without leaving the page; terms stay in memory like the list's search. */
-function PatientLookup() {
-  const search = usePatientSearch();
-  const { terms } = search;
-  const { queryKey, call } = patientListQuery(
-    { ...DEFAULT_LIST_PARAMS, scope: "all", page_size: LOOKUP_RESULTS },
-    terms,
-  );
-  const results = useApiQuery(queryKey, call, { enabled: terms !== null });
-
-  return (
-    <div className="space-y-3">
-      <h2 className="text-[17px] font-semibold">Find a patient</h2>
-      <PatientSearchFields search={search} />
-      {terms &&
-        results.data &&
-        (results.data.items.length > 0 ? (
-          <ul aria-label="Matching patients" className="divide-y rounded-xl border bg-card">
-            {results.data.items.map((p) => (
-              <li key={p.id}>
-                <Link
-                  to={`/patients/${p.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted"
-                >
-                  <span className="font-medium">
-                    {p.last_name}, {p.first_name}
-                  </span>
-                  <span className="text-[12px] text-muted-foreground tabular-nums">
-                    {formatDob(p.dob)} · {p.mrn}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-[13px] text-muted-foreground">No patients match</p>
-        ))}
-    </div>
   );
 }

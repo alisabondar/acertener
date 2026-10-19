@@ -24,8 +24,12 @@ describe("app shell", () => {
     renderApp("/");
     await nav();
     const sidebar = () => document.querySelector('[data-slot="sidebar"][data-state]');
+    // The toggle lives in the sidebar itself, next to the product name.
     const toggle = () =>
-      within(screen.getByRole("main")).getByRole("button", { name: "Toggle Sidebar" });
+      within(document.querySelector<HTMLElement>('[data-slot="sidebar-header"]')!).getByRole(
+        "button",
+        { name: "Toggle Sidebar" },
+      );
 
     await user.click(toggle());
     expect(sidebar()).toHaveAttribute("data-state", "collapsed");
@@ -38,7 +42,7 @@ describe("app shell", () => {
     ["/", "My day"],
     ["/patients", "Patients"],
     ["/patients/new", "New patient"],
-    ["/patients/11111111-1111-4111-8111-111111111111", "Patient chart"],
+    ["/patients/11111111-1111-4111-8111-111111111111", "Osei, Daniel"],
   ])("routes %s to its page", async (path, heading) => {
     renderApp(path);
 

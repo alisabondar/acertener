@@ -3,14 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import {
-  BROOKS,
-  makeDay,
-  makePage,
-  makePatient,
-  makeVisit,
-  type ScheduledVisit,
-} from "@/test/factories";
+import { BROOKS, makeDay, makeVisit, type ScheduledVisit } from "@/test/factories";
 import { server } from "@/test/msw/server";
 import { renderApp } from "@/test/render";
 
@@ -53,7 +46,7 @@ describe("My day", () => {
     dayIs([
       makeVisit(-60, { status: "checked_in" }),
       makeVisit(-30, { status: "no_show" }),
-      makeVisit(30),
+      makeVisit(-90, { status: "completed" }),
       makeVisit(60),
     ]);
     renderApp("/");
@@ -61,7 +54,8 @@ describe("My day", () => {
     const summary = await screen.findByRole("region", { name: "Today at a glance" });
     await waitFor(() => expect(summary).toHaveTextContent(/Today's visits\s*4/));
     expect(summary).toHaveTextContent(/Checked in\s*1/);
-    expect(summary).toHaveTextContent(/Still to come\s*2/);
+    expect(summary).toHaveTextContent(/Completed\s*1/);
+    expect(summary).not.toHaveTextContent(/Still to come/);
     expect(summary).toHaveTextContent(/No-shows\s*1/);
     // The schedule is by provider and the list by care team, so the counts aren't links.
     expect(within(summary).queryByRole("link")).not.toBeInTheDocument();
@@ -96,7 +90,11 @@ describe("My day", () => {
     dayIs([visit]);
     const { router } = renderApp("/");
 
-    await userEvent.click(within(await schedule()).getByRole("link", { name: /Patient/ }));
+    // The whole visit card is the link, so there's exactly one per visit.
+    const [card] = within(await schedule()).getAllByRole("link");
+    expect(within(await schedule()).getAllByRole("link")).toHaveLength(1);
+    expect(card).toHaveTextContent(/\d:\d\d [AP]M/);
+    await userEvent.click(card!);
 
     expect(router.state.location.pathname).toBe(`/patients/${visit.patient.id}`);
   });
@@ -117,21 +115,11 @@ describe("My day", () => {
     expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
   });
 
-  it("looks patients up inline without putting the search in the URL", async () => {
-    const user = userEvent.setup();
-    const match = makePatient({ last_name: "Osei", first_name: "Daniel" });
-    server.use(http.post("/api/v1/patients/search", () => HttpResponse.json(makePage([match]))));
-    const { router } = renderApp("/");
+  it("leaves patient search to the Patients page", async () => {
+    dayIs([makeVisit(30)]);
+    renderApp("/");
 
-    await user.type(await screen.findByRole("searchbox", { name: "Search patients" }), "osei");
-
-    const results = await screen.findByRole("list", { name: "Matching patients" });
-    await waitFor(() =>
-      expect(within(results).getByRole("link", { name: /Osei, Daniel/ })).toHaveAttribute(
-        "href",
-        `/patients/${match.id}`,
-      ),
-    );
-    expect(router.state.location.search).not.toMatch(/osei/i);
+    await schedule();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 });

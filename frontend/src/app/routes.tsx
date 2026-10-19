@@ -7,7 +7,7 @@ import { NotFound } from "@/pages/NotFound";
 import { Placeholder } from "@/pages/Placeholder";
 import { RouteError } from "@/pages/RouteError";
 
-import { PatientList } from "./lazyPages";
+import { PatientChart, PatientList } from "./lazyPages";
 import { Shell } from "./Shell";
 
 export const appRoutes: RouteObject[] = [
@@ -44,7 +44,7 @@ export const appRoutes: RouteObject[] = [
             path: "patients/:patientId",
             element: (
               <RequirePermission permission="VIEW_DEMOGRAPHICS">
-                <Placeholder title="Patient chart" note="Demographics and clinical record." />
+                <PatientChart />
               </RequirePermission>
             ),
           },

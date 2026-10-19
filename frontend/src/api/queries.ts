@@ -1,4 +1,13 @@
-import { useQuery, type QueryKey, type UseQueryResult } from "@tanstack/react-query";
+import {
+  type QueryKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
+
+import { ApiProblem } from "./errors";
 
 import type { components, paths } from "./schema";
 
@@ -24,6 +33,9 @@ export const queryKeys = {
       ["patients", "search", params, terms] as const,
     counts: (scope: Scope) => ["patients", "counts", scope] as const,
     detail: (id: string) => ["patients", "detail", id] as const,
+    /** One part of a chart; `chart(id)` alone matches every part, for invalidating after writes. */
+    chart: (id: string, part?: "notes" | "vitals" | "allergies" | "conditions" | "access") =>
+      part ? (["patients", "chart", id, part] as const) : (["patients", "chart", id] as const),
   },
 };
 
@@ -63,4 +75,27 @@ export function apiQueryFn<T>(call: (signal: AbortSignal) => Promise<{ data?: T 
     if (data === undefined) throw new Error("The API returned no data");
     return data;
   };
+}
+
+/**
+ * A write over an openapi-fetch call. On success it refreshes `invalidate` (and anything
+ * under those keys), so screens show the saved state rather than a local guess.
+ */
+export function useApiMutation<TVars, T = unknown>(
+  call: (vars: TVars) => Promise<{ data?: T }>,
+  { invalidate }: { invalidate: QueryKey[] },
+): UseMutationResult<T | undefined, Error, TVars> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: TVars) => (await call(vars)).data,
+    onSuccess: () =>
+      Promise.all(invalidate.map((queryKey) => queryClient.invalidateQueries({ queryKey }))),
+  });
+}
+
+/** Field errors from a 422 (`errors`, keyed by field name), or none. */
+export function fieldErrors(error: unknown): Record<string, string> {
+  if (!(error instanceof ApiProblem)) return {};
+  const errors = error.extras["errors"];
+  return errors && typeof errors === "object" ? (errors as Record<string, string>) : {};
 }

@@ -10,6 +10,7 @@
   --color-status-inactive: var(--status-inactive);
   --color-status-deceased: var(--status-deceased);
   --color-severe: var(--severe);
+  --color-brand: var(--brand);
   --font-heading: var(--font-sans);
   --font-sans: "Geist Variable", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -81,6 +82,8 @@
   --status-inactive: #92400e;
   --status-deceased: #4b5563;
   --severe: #b91c1c;
+  /* Section titles and other structure that should stand apart from content. */
+  --brand: #1d4ed8;
   --radius: 0.625rem;
   --sidebar: #1e293b;
   --sidebar-foreground: #cbd5e1;

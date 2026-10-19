@@ -76,8 +76,11 @@ export function Shell() {
     <TooltipProvider>
       <SidebarProvider>
         <Sidebar collapsible="icon">
-          <SidebarHeader className="px-4 py-4 text-[15px] font-semibold group-data-[collapsible=icon]:px-2">
-            <span className="truncate group-data-[collapsible=icon]:hidden">Acertener</span>
+          <SidebarHeader className="flex-row items-center justify-between px-3 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
+            <span className="truncate px-1 text-[15px] font-semibold group-data-[collapsible=icon]:hidden">
+              Acertener
+            </span>
+            <SidebarTrigger className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
@@ -104,7 +107,6 @@ export function Shell() {
         </Sidebar>
         <SidebarInset>
           <header className="flex h-14 items-center gap-3 border-b border-border px-4">
-            <SidebarTrigger />
             <UserMenu />
           </header>
           <div className="mx-auto w-full max-w-7xl px-8 py-6">

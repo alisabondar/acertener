@@ -5,6 +5,7 @@ import { PERSONA_HEADER } from "@/api/client";
 import {
   makeCounts,
   makeDay,
+  makeDetail,
   makeMe,
   makePage,
   makePatient,
@@ -25,4 +26,8 @@ export const handlers = [
   http.post("/api/v1/patients/search", () => HttpResponse.json(makePage([]))),
   http.get("/api/v1/patients/filter-counts", () => HttpResponse.json(makeCounts())),
   http.get("/api/v1/visits/today", () => HttpResponse.json(makeDay([]))),
+  http.get("/api/v1/patients/:patientId", ({ params }) =>
+    HttpResponse.json(makeDetail({ id: String(params["patientId"]) })),
+  ),
+  http.get("/api/v1/patients/:patientId/allergies", () => HttpResponse.json({ items: [] })),
 ];

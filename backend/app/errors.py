@@ -24,6 +24,11 @@ class ErrorCode(Enum):
     )
     DUPLICATE_MRN = (HTTPStatus.CONFLICT, "Another patient already has this MRN.")
     VERSION_CONFLICT = (HTTPStatus.CONFLICT, "Someone else changed this record first.")
+    NOT_NOTE_AUTHOR = (HTTPStatus.FORBIDDEN, "Only the note's author can do this.")
+    NOTE_FINALIZED = (
+        HTTPStatus.CONFLICT,
+        "This note is finalized; it can't be edited or deleted.",
+    )
     INVALID_STATE = (
         HTTPStatus.CONFLICT,
         "That action doesn't apply to the record's current state.",
@@ -93,3 +98,11 @@ class VersionConflictError(AppError):
 
 class InvalidStateError(AppError):
     code = ErrorCode.INVALID_STATE
+
+
+class NotNoteAuthorError(AppError):
+    code = ErrorCode.NOT_NOTE_AUTHOR
+
+
+class NoteFinalizedError(AppError):
+    code = ErrorCode.NOTE_FINALIZED
