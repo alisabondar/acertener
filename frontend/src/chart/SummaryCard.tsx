@@ -15,11 +15,11 @@ type Summary = components["schemas"]["SummaryOut"];
 
 const GENERATING_POLL_MS = 2_000;
 
-/** When to ask again: every 2s while generating, at the refresh time while stale, else never. */
+/** When to ask again: every 2s while generating, at the refresh time while pending, else never. */
 function nextPoll(summary: Summary | undefined): number | false {
   if (!summary) return false;
   if (summary.status === "generating") return GENERATING_POLL_MS;
-  if (summary.status === "stale" && summary.next_refresh_at) {
+  if ((summary.status === "stale" || summary.status === "waiting") && summary.next_refresh_at) {
     return Math.max(1_000, parseISO(summary.next_refresh_at).getTime() - Date.now() + 500);
   }
   return false;
@@ -113,6 +113,15 @@ function Body({ summary, now, onRetry }: { summary: Summary; now: Date; onRetry:
       </div>
     );
   }
+  if (summary.status === "waiting" && !summary.narrative) {
+    return (
+      <p role="status" className="flex items-center gap-2 text-[14px] text-muted-foreground">
+        <LoaderCircle className="size-4 animate-spin" aria-hidden />
+        Generating… the AI service is busy, trying again in{" "}
+        {secondsUntil(summary.next_refresh_at ?? now.getTime(), now)}s
+      </p>
+    );
+  }
   if (summary.status === "generating" && !summary.narrative) {
     return (
       <p role="status" className="flex items-center gap-2 text-[14px] text-muted-foreground">
@@ -127,15 +136,17 @@ function Body({ summary, now, onRetry }: { summary: Summary; now: Date; onRetry:
       <p className="text-[12px] text-muted-foreground" aria-live="polite">
         {summary.status === "stale" && summary.next_refresh_at
           ? `New changes, refreshing in ${secondsUntil(summary.next_refresh_at, now)}s`
-          : summary.status === "generating"
-            ? "Updating…"
-            : summary.generated_at
-              ? `Updated ${formatDistanceToNowStrict(parseISO(summary.generated_at), {
-                  addSuffix: true,
-                })
-                  .replace(" minutes", " min")
-                  .replace(" minute", " min")}`
-              : null}
+          : summary.status === "waiting" && summary.next_refresh_at
+            ? `Update queued, trying again in ${secondsUntil(summary.next_refresh_at, now)}s`
+            : summary.status === "generating"
+              ? "Updating…"
+              : summary.generated_at
+                ? `Updated ${formatDistanceToNowStrict(parseISO(summary.generated_at), {
+                    addSuffix: true,
+                  })
+                    .replace(" minutes", " min")
+                    .replace(" minute", " min")}`
+                : null}
       </p>
     </div>
   );

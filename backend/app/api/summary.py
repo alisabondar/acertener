@@ -37,6 +37,10 @@ AuditDep = Annotated[Audit, Depends(get_audit)]
 # "Refresh now" is allowed once per this many seconds per patient.
 MANUAL_REFRESH_SECONDS = 10
 
+# A pending update keeps the last narrative on screen; these statuses say why there isn't one.
+SHOWS_NARRATIVE = ("fresh", "stale", "waiting", "generating")
+SHOWS_ERROR = ("waiting", "failed", "blocked")
+
 
 def get_gateway(request: Request) -> Gateway:
     gateway: Gateway = request.app.state.gateway
@@ -67,7 +71,7 @@ async def _out(
         datetime.now(UTC), ZoneInfo(request.app.state.settings.practice_timezone)
     )
     row = state.row
-    narrative = row.content if row and row.status in ("fresh", "stale", "generating") else None
+    narrative = row.content if row and row.status in SHOWS_NARRATIVE else None
     return SummaryOut(
         header=SummaryHeader(
             first_name=patient.first_name,
@@ -86,7 +90,7 @@ async def _out(
         provider=row.model if row and narrative else None,
         generated_at=row.generated_at if row else None,
         next_refresh_at=state.next_refresh_at,
-        error_code=row.error_code if row and row.status in ("failed", "blocked") else None,
+        error_code=row.error_code if row and row.status in SHOWS_ERROR else None,
     )
 
 

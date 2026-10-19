@@ -361,16 +361,73 @@ class RateLimitedProvider(MockProvider):
         return RateLimited(retry_after=20)
 
 
-async def test_a_rate_limited_provider_leaves_the_summary_waiting_to_retry(
-    api: Api, app: FastAPI, doctor: User, patient: Patient
+async def test_a_rate_limited_first_view_waits_for_the_provider_not_for_a_change(
+    api: Api,
+    app: FastAPI,
+    db_session: AsyncSession,
+    doctor: User,
+    patient: Patient,
+    clock: Clock,
 ) -> None:
+    app.state.gateway = Gateway(RateLimitedProvider(), TokenBucket(per_minute=1000))
+    asked_at = clock.now
+
+    await _summary(api, doctor, patient)
+    waiting = await _summary(api, doctor, patient)
+    row = await db_session.get(PatientSummary, patient.id, populate_existing=True)
+    clock.advance(20)
+    retried = await _summary(api, doctor, patient)
+
+    assert waiting["status"] == "waiting"
+    assert waiting["error_code"] == "rate_limited"
+    # The provider's wait only: no edit happened, so no debounce on top.
+    assert datetime.fromisoformat(waiting["next_refresh_at"]) == asked_at + timedelta(seconds=20)
+    assert row is not None
+    assert row.source_changed_at is None
+    assert retried["status"] == "generating"
+
+
+async def test_a_rate_limit_keeps_the_last_summary_on_screen(
+    api: Api, app: FastAPI, db_session: AsyncSession, doctor: User, patient: Patient
+) -> None:
+    await _set_summary(
+        db_session,
+        patient,
+        content="Earlier narrative.",
+        input_hash="older-chart",
+        generated_at=datetime.now(UTC) - timedelta(days=1),
+        source_changed_at=datetime.now(UTC) - timedelta(hours=1),
+    )
     app.state.gateway = Gateway(RateLimitedProvider(), TokenBucket(per_minute=1000))
 
     await _summary(api, doctor, patient)
     body = await _summary(api, doctor, patient)
 
+    assert body["status"] == "waiting"
+    assert body["narrative"] == "Earlier narrative."
+
+
+async def test_an_edit_while_waiting_waits_for_both_the_provider_and_the_debounce(
+    api: Api,
+    app: FastAPI,
+    db_session: AsyncSession,
+    doctor: User,
+    patient: Patient,
+    clock: Clock,
+) -> None:
+    await _set_summary(
+        db_session,
+        patient,
+        retry_at=clock.now + timedelta(seconds=30),
+        source_changed_at=clock.now,
+    )
+    clock.advance(16)
+
+    body = await _summary(api, doctor, patient)
+
+    # A real edit, so "stale"; it still can't run before the provider's window reopens.
     assert body["status"] == "stale"
-    assert body["next_refresh_at"] is not None
+    assert datetime.fromisoformat(body["next_refresh_at"]) == clock.now + timedelta(seconds=14)
 
 
 async def test_a_change_during_generation_leaves_the_result_stale(

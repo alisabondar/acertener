@@ -10,7 +10,7 @@ from app.db.types import EncryptedText
 RECORD_STATUSES = ("active", "resolved", "entered_in_error")
 ALLERGY_SEVERITIES = ("mild", "moderate", "severe")
 NOTE_STATUSES = ("draft", "final")
-SUMMARY_STATUSES = ("fresh", "stale", "generating", "failed", "blocked")
+SUMMARY_STATUSES = ("fresh", "stale", "waiting", "generating", "failed", "blocked")
 
 
 class Allergy(Base):
@@ -92,5 +92,7 @@ class PatientSummary(Base):
     source_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(Text)
     generation_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the AI provider said it will take another request; separate from chart edits.
+    retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (CheckConstraint(one_of("status", SUMMARY_STATUSES), name="status"),)

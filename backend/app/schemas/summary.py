@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.schemas.clinical import Severity
 
-SummaryStatus = Literal["fresh", "stale", "generating", "failed", "blocked"]
+SummaryStatus = Literal["fresh", "stale", "waiting", "generating", "failed", "blocked"]
 
 
 class SummaryAllergy(BaseModel):

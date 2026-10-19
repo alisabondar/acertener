@@ -17,7 +17,10 @@ patients (about a minute the first time), and prints the URLs:
   switches between Jordan Rivera (NP), Sam Okafor (RN), Taylor Brooks (front desk), and Practice
   Admin; each role sees and can do only what it's allowed.
 - **AI summaries:** `./dev.sh` asks once for an optional Gemini key; without one, a built-in mock
-  writes them.
+  writes them. A free Gemini key allows only a few summaries a minute, so a chart opened for the
+  first time may show "AI service is busy, trying again in Ns"; it retries on its own. Once
+  generated, a summary is saved and reused until the chart is edited. For an uninterrupted demo,
+  set `SUMMARY_PROVIDER=mock` in `.env`.
 - **More:** `./dev.sh test` (all tests), `./dev.sh proof` (see the encryption),
   `./dev.sh reset` (fresh data), `./dev.sh stop`. The full tour is in
   [Getting started](docs/getting-started.md).

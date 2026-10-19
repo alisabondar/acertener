@@ -49,6 +49,17 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def next_attempt(
+    source_changed_at: datetime | None, retry_at: datetime | None, debounce: timedelta
+) -> datetime | None:
+    """When a pending summary may next generate: after edits settle and the provider's wait ends.
+
+    None means now.
+    """
+    times = [t for t in (source_changed_at and source_changed_at + debounce, retry_at) if t]
+    return max(times, default=None)
+
+
 async def chart_inputs(
     session: AsyncSession, patient_id: uuid.UUID
 ) -> tuple[PatientIdentifiers, ChartRecords]:
@@ -135,15 +146,15 @@ class SummaryService:
         row = await self._row(patient_id)
         if row is None:
             claimed = await self._claim_new(patient_id, now)
-        elif row.status in ("stale", "generating"):
-            due = row.source_changed_at is None or now - row.source_changed_at >= self._debounce
-            claimed = due and await self._claim(patient_id, now)
+        elif row.status in ("stale", "waiting", "generating"):
+            at = next_attempt(row.source_changed_at, row.retry_at, self._debounce)
+            claimed = (at is None or now >= at) and await self._claim(patient_id, now)
         else:
             claimed = False
         row = await self._row(patient_id)
         next_refresh = None
-        if row and row.status == "stale" and row.source_changed_at:
-            next_refresh = row.source_changed_at + self._debounce
+        if row and row.status in ("stale", "waiting"):
+            next_refresh = next_attempt(row.source_changed_at, row.retry_at, self._debounce)
         return SummaryState(row, claimed, next_refresh)
 
     async def claim_now(self, patient_id: uuid.UUID) -> bool:
@@ -162,7 +173,7 @@ class SummaryService:
                     PatientSummary.generation_started_at < now - STUCK_AFTER,
                 ),
             )
-            .values(status="generating", generation_started_at=now)
+            .values(status="generating", generation_started_at=now, retry_at=None)
             .returning(PatientSummary.patient_id)
         )
         await self._session.commit()
@@ -177,12 +188,12 @@ class SummaryService:
             .where(
                 PatientSummary.patient_id == patient_id,
                 or_(
-                    PatientSummary.status == "stale",
+                    PatientSummary.status.in_(("stale", "waiting")),
                     (PatientSummary.status == "generating")
                     & (PatientSummary.generation_started_at < now - STUCK_AFTER),
                 ),
             )
-            .values(status="generating", generation_started_at=now)
+            .values(status="generating", generation_started_at=now, retry_at=None)
             .returning(PatientSummary.patient_id)
         )
         await self._session.commit()
@@ -258,11 +269,11 @@ async def _generate(
                 )
             )
         elif isinstance(result, RateLimited):
-            # Try again once the provider's window reopens.
+            # Try again once the provider's window reopens; the last narrative stays on screen.
             values |= {
-                "status": "stale",
+                "status": "waiting",
                 "error_code": "rate_limited",
-                "source_changed_at": _now() + timedelta(seconds=result.retry_after),
+                "retry_at": _now() + timedelta(seconds=result.retry_after),
             }
             values.pop("input_hash")
         else:
@@ -273,7 +284,7 @@ async def _generate(
     if (
         row.source_changed_at
         and row.source_changed_at > started
-        and values.get("status") == "fresh"
+        and values.get("status") in ("fresh", "waiting")
     ):
         values["status"] = "stale"
     await session.execute(

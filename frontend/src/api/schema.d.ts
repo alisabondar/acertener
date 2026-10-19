@@ -1205,7 +1205,7 @@ export interface components {
        * Status
        * @enum {string}
        */
-      status: "fresh" | "stale" | "generating" | "failed" | "blocked";
+      status: "fresh" | "stale" | "waiting" | "generating" | "failed" | "blocked";
     };
     /** TodaysVisits */
     TodaysVisits: {

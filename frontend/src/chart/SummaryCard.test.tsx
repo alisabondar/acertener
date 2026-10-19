@@ -11,7 +11,7 @@ const patient = makeDetail();
 const url = `/api/v1/patients/${patient.id}/summary`;
 
 type Summary = {
-  status: "fresh" | "stale" | "generating" | "failed" | "blocked";
+  status: "fresh" | "stale" | "waiting" | "generating" | "failed" | "blocked";
   narrative: string | null;
   generated_at: string | null;
   next_refresh_at: string | null;
@@ -75,6 +75,37 @@ describe("AI summary", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("says the AI service is busy, not that the chart changed, on a first load", async () => {
+    const soon = new Date(Date.now() + 20_000).toISOString();
+    summaryIs(
+      summary({
+        status: "waiting",
+        narrative: null,
+        generated_at: null,
+        error_code: "rate_limited",
+        next_refresh_at: soon,
+      }),
+    );
+    renderApp(`/patients/${patient.id}`);
+
+    const region = await card();
+    expect(
+      await within(region).findByText(/AI service is busy, trying again in (19|20)s/),
+    ).toBeInTheDocument();
+    expect(region).not.toHaveTextContent("New changes");
+  });
+
+  it("keeps the last summary on screen while an update waits on the AI service", async () => {
+    const soon = new Date(Date.now() + 20_000).toISOString();
+    summaryIs(summary({ status: "waiting", error_code: "rate_limited", next_refresh_at: soon }));
+    renderApp(`/patients/${patient.id}`);
+
+    const region = await card();
+    expect(await within(region).findByText("70-year-old with hypertension.")).toBeInTheDocument();
+    expect(within(region).getByText(/Update queued, trying again in (19|20)s/)).toBeInTheDocument();
+    expect(region).not.toHaveTextContent("New changes");
   });
 
   it("polls while generating and shows the result when it's ready", async () => {
