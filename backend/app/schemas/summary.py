@@ -21,6 +21,9 @@ class SummaryCondition(BaseModel):
 class SummaryHeader(BaseModel):
     """Straight from the chart, never from the AI, so it's always available and exact."""
 
+    first_name: str
+    last_name: str
+    age: int
     allergies: list[SummaryAllergy]
     conditions: list[SummaryCondition]
 

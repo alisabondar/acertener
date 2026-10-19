@@ -14,6 +14,8 @@ x-backend: &backend
     KEYS_DIR: /keys
     ENV: ${ENV:-development}
     DEMO_MODE: ${DEMO_MODE:-true}
+    # From .env unless the shell overrides it (./dev.sh test e2e forces the mock).
+    SUMMARY_PROVIDER: ${SUMMARY_PROVIDER:-auto}
   volumes:
     - keys:/keys
 
@@ -88,6 +90,8 @@ services:
 
   web:
     build: ./frontend
+    # Sync node_modules (a volume, so it outlives image rebuilds) with the lockfile on every start.
+    command: ["sh", "-c", "bun install --frozen-lockfile && exec bun run dev --host 0.0.0.0"]
     environment:
       API_PROXY_TARGET: http://api:8000
       # Lets the e2e container reach Vite by its service name.

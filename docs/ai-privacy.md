@@ -30,6 +30,7 @@ chart rows ──► de-identifier ──► DeidentifiedClinicalContext ──�
 | Notes | **Finalized notes only**, scrubbed, with day offsets. Drafts never leave |
 | Vitals | Day offset and the readings |
 | Diagnoses | ICD-10 code, name, and status (active or resolved); entered-in-error ones are dropped |
+| Allergies | Active ones only: substance (scrubbed) and severity. Reactions and inactive allergies aren't sent |
 
 ## What is never sent
 
@@ -56,7 +57,9 @@ no code with the scrubber, so one module's bug can't hide in the other.
   patient ID, date of birth in about ten formats, phone digits (any separators), email, address
   parts, ZIP, and staff names.
 - **Generic patterns:** any UUID, SSN, URL, IP address, email, phone, MRN number, or absolute date.
-- **Name and place detection** with Presidio (spaCy's small English model).
+- **Name and place detection** with Presidio (spaCy's small English model). Words from the chart's own
+  allergy and condition names (already scrubbed) aren't counted as names, because the detector can
+  read a bare drug like "Lisinopril" as a person; this patient's identifiers are still matched exactly.
 
 On any hit nothing is sent (or the reply isn't shown): the summary's status becomes `blocked`, the
 narrative is empty, and an `llm_payload_blocked` audit entry records **which detectors fired and

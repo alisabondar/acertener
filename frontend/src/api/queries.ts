@@ -7,6 +7,9 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
+import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
+import { toast } from "sonner";
+
 import { ApiProblem } from "./errors";
 
 import type { components, paths } from "./schema";
@@ -91,16 +94,32 @@ export function apiQueryFn<T>(call: (signal: AbortSignal) => Promise<{ data?: T 
  * A write over an openapi-fetch call. On success it refreshes `invalidate` (and anything
  * under those keys), so screens show the saved state rather than a local guess.
  */
+/**
+ * A write that refreshes `invalidate` afterwards. `success` is shown as a toast once it lands;
+ * failures stay next to the form that caused them, where the user can fix them.
+ */
 export function useApiMutation<TVars, T = unknown>(
   call: (vars: TVars) => Promise<{ data?: T }>,
-  { invalidate }: { invalidate: QueryKey[] },
+  { invalidate, success }: { invalidate: QueryKey[]; success?: string },
 ): UseMutationResult<T | undefined, Error, TVars> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (vars: TVars) => (await call(vars)).data,
-    onSuccess: () =>
-      Promise.all(invalidate.map((queryKey) => queryClient.invalidateQueries({ queryKey }))),
+    onSuccess: async () => {
+      if (success) toast.success(success);
+      await Promise.all(invalidate.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+    },
   });
+}
+
+/** Puts a 422's field errors on the form's matching fields; returns whether there were any. */
+export function setServerErrors<T extends FieldValues>(
+  error: unknown,
+  setError: UseFormSetError<T>,
+): boolean {
+  const errors = Object.entries(fieldErrors(error));
+  for (const [field, message] of errors) setError(field as Path<T>, { type: "server", message });
+  return errors.length > 0;
 }
 
 /** Field errors from a 422 (`errors`, keyed by field name), or none. */

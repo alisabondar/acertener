@@ -4,7 +4,7 @@ A clinician-facing patient dashboard, built HIPAA-ready: encrypted at rest, audi
 and an AI summary that can't leak who the patient is. All data is synthetic.
 
 ```bash
-git clone <repo-url> patient-dashboard && cd patient-dashboard && ./dev.sh
+git clone https://github.com/alisabondar/acertener.git && cd acertener && ./dev.sh
 ```
 
 Docker is the only prerequisite. Then open http://localhost:5173: there's no login, and the

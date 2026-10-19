@@ -25,7 +25,7 @@ def _new(**overrides: Any) -> dict[str, Any]:
         "mrn": "MRN-900001",
         "dob": "1984-02-29",
         "gender": "female",
-        "phone": "555-0100",
+        "phone": "555-555-0100",
     }
     body.update(overrides)
     return body
@@ -135,9 +135,11 @@ async def test_edit_saves_and_audits_only_changed_fields(
     api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher
 ) -> None:
     editor = await add_user(db_session, "front_desk")
-    patient = await create_patient(db_session, field_cipher, city="Springfield", phone="555-0100")
+    patient = await create_patient(
+        db_session, field_cipher, city="Springfield", phone="555-555-0100"
+    )
 
-    response = await _patch(api, editor, patient.id, 1, city="Shelbyville", phone="555-0100")
+    response = await _patch(api, editor, patient.id, 1, city="Shelbyville", phone="555-555-0100")
 
     assert response.status_code == 200
     assert (response.json()["city"], response.json()["version"]) == ("Shelbyville", 2)

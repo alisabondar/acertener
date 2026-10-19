@@ -16,6 +16,7 @@ from app.auth.permissions import Permission, require
 from app.db.models import User
 from app.db.session import DbSession
 from app.errors import NotFoundError, RateLimitedError
+from app.patients.derived import age_on
 from app.patients.queries import practice_today
 from app.schemas.clinical import Severity
 from app.schemas.summary import (
@@ -58,12 +59,20 @@ async def _run_generation(
         await generate(session, gateway, audit, patient_id)
 
 
-async def _out(service: SummaryService, patient_id: uuid.UUID, state: SummaryState) -> SummaryOut:
-    allergies, conditions = await service.header(patient_id)
+async def _out(
+    request: Request, service: SummaryService, patient_id: uuid.UUID, state: SummaryState
+) -> SummaryOut:
+    patient, allergies, conditions = await service.header(patient_id)
+    today = practice_today(
+        datetime.now(UTC), ZoneInfo(request.app.state.settings.practice_timezone)
+    )
     row = state.row
     narrative = row.content if row and row.status in ("fresh", "stale", "generating") else None
     return SummaryOut(
         header=SummaryHeader(
+            first_name=patient.first_name,
+            last_name=patient.last_name,
+            age=age_on(patient.dob, today),
             allergies=[
                 SummaryAllergy(substance=a.substance, severity=cast(Severity | None, a.severity))
                 for a in allergies
@@ -95,7 +104,7 @@ async def get_summary(
     if state.claimed:
         background.add_task(_run_generation, request, gateway, user, patient_id)
     audit.record_read(AuditEntry(AuditAction.VIEW, "patient_summary", patient_id, patient_id))
-    return await _out(service, patient_id, state)
+    return await _out(request, service, patient_id, state)
 
 
 @router.post("/patients/{patient_id}/summary/refresh", status_code=202)
@@ -120,7 +129,7 @@ async def refresh_summary(
     service = _service(request, session)
     if await service.claim_now(patient_id):
         background.add_task(_run_generation, request, gateway, user, patient_id)
-    return await _out(service, patient_id, await service.view(patient_id))
+    return await _out(request, service, patient_id, await service.view(patient_id))
 
 
 @router.get("/dev/patients/{patient_id}/ai-payload")
@@ -138,7 +147,7 @@ async def preview_payload(
     ids, records = await chart_inputs(session, patient_id)
     tz = request.app.state.settings.practice_timezone
     context = build_context(ids, records, practice_today(datetime.now(UTC), ZoneInfo(tz)))
-    verdict = leak_check(context.model_dump_json(), ids)
+    verdict = leak_check(context.model_dump_json(), ids, context.clinical_terms())
     audit.record_read(AuditEntry(AuditAction.VIEW, "ai_payload_preview", patient_id, patient_id))
     payload: dict[str, Any] = context.model_dump(mode="json")
     return PayloadPreview(

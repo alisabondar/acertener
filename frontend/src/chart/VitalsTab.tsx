@@ -1,11 +1,22 @@
 import { format, parseISO } from "date-fns";
-import { useId, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { api } from "@/api";
-import { fieldErrors, queryKeys, useApiMutation } from "@/api/queries";
+import { queryKeys, setServerErrors, useApiMutation } from "@/api/queries";
 import type { components } from "@/api/schema";
 import { usePermission } from "@/auth/context";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -62,77 +73,83 @@ export function VitalsTab({ patientId }: { patientId: string }) {
   );
 }
 
+// Every reading is optional and typed as text; the server checks the physiologic ranges.
+const vitalsForm = z.object(
+  Object.fromEntries(FIELDS.map(({ key }) => [key, z.string()])) as Record<
+    keyof VitalsCreate,
+    z.ZodString
+  >,
+);
+type VitalsForm = z.infer<typeof vitalsForm>;
+const EMPTY = Object.fromEntries(FIELDS.map(({ key }) => [key, ""])) as VitalsForm;
+
 function RecordVitals({ patientId, onDone }: { patientId: string; onDone: () => void }) {
-  const ids = useId();
-  const [values, setValues] = useState<Partial<Record<keyof VitalsCreate, string>>>({});
+  const form = useForm<VitalsForm>({ resolver: zodResolver(vitalsForm), defaultValues: EMPTY });
   const save = useApiMutation(
     (body: VitalsCreate) =>
       api.POST("/api/v1/patients/{patient_id}/vitals", {
         params: { path: { patient_id: patientId } },
         body,
       }),
-    { invalidate: [queryKeys.patients.chart(patientId)] },
+    { invalidate: [queryKeys.patients.chart(patientId)], success: "Vitals recorded" },
   );
-  const errors = fieldErrors(save.error);
 
-  const submit = () => {
+  const submit = form.handleSubmit(async (values) => {
     const body = Object.fromEntries(
       Object.entries(values)
-        .filter(([, v]) => v !== undefined && v !== "")
+        .filter(([, v]) => v !== "")
         .map(([k, v]) => [k, Number(v)]),
     ) as VitalsCreate;
-    void save
-      .mutateAsync(body)
-      .then(onDone)
-      .catch(() => {});
-  };
+    try {
+      await save.mutateAsync(body);
+      onDone();
+    } catch (error) {
+      setServerErrors(error, form.setError);
+    }
+  });
 
   return (
-    <form
-      aria-label="Record vitals"
-      className="space-y-3 rounded-xl border bg-card p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        submit();
-      }}
-    >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {FIELDS.map(({ key, label, step }) => {
-          const error = errors[key];
-          return (
-            <div key={key}>
-              <label className="space-y-1 text-[13px] text-muted-foreground">
-                <span className="block">{label}</span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step={step ?? "1"}
-                  value={values[key] ?? ""}
-                  aria-invalid={error !== undefined}
-                  aria-describedby={error ? `${ids}-${key}` : undefined}
-                  onChange={(event) => setValues({ ...values, [key]: event.target.value })}
-                  className="bg-card text-foreground tabular-nums"
-                />
-              </label>
-              {error && (
-                <p id={`${ids}-${key}`} className="mt-1 text-[12px] text-severe">
-                  {error}
-                </p>
+    <Form {...form}>
+      <form
+        aria-label="Record vitals"
+        className="space-y-3 rounded-xl border bg-card p-4"
+        onSubmit={(event) => void submit(event)}
+      >
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {FIELDS.map(({ key, label, step }) => (
+            <FormField
+              key={key}
+              control={form.control}
+              name={key}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{label}</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      inputMode="decimal"
+                      step={step ?? "1"}
+                      className="bg-card text-foreground tabular-nums"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
-          );
-        })}
-      </div>
-      <WriteError error={save.error} action="record vitals" />
-      <div className="flex gap-2">
-        <Button type="submit" disabled={save.isPending}>
-          Save vitals
-        </Button>
-        <Button type="button" variant="ghost" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+            />
+          ))}
+        </div>
+        <WriteError error={save.error} action="record vitals" />
+        <div className="flex gap-2">
+          <Button type="submit" disabled={save.isPending}>
+            Save vitals
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }
 

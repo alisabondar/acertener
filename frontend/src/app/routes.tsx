@@ -33,14 +33,6 @@ export const appRoutes: RouteObject[] = [
             ),
           },
           {
-            path: "patients/new",
-            element: (
-              <RequirePermission permission="CREATE_PATIENT">
-                <Placeholder title="New patient" note="Register a patient." />
-              </RequirePermission>
-            ),
-          },
-          {
             path: "patients/:patientId",
             element: (
               <RequirePermission permission="VIEW_DEMOGRAPHICS">

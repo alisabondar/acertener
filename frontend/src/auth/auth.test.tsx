@@ -58,7 +58,7 @@ describe("demo identity", () => {
     expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: "My day" })).not.toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Loading" })).toHaveTextContent(
-      "Loading your day as Sam Okafor",
+      "Loading your view as Sam Okafor",
     );
     await waitFor(async () =>
       expect(await banner()).toHaveTextContent("Viewing as Sam Okafor (Nurse, RN)"),
@@ -92,10 +92,10 @@ it("explains the problem instead of loading forever when no personas are seeded"
 
 describe("role-aware navigation", () => {
   it.each<[string, Persona, string[]]>([
-    [CHEN.name, CHEN, ["My day", "Patients", "New patient"]],
-    [RIVERA.name, RIVERA, ["My day", "Patients", "New patient"]],
-    [OKAFOR.name, OKAFOR, ["My day", "Patients", "New patient"]],
-    [BROOKS.name, BROOKS, ["My day", "Patients", "New patient"]],
+    [CHEN.name, CHEN, ["My day", "Patients"]],
+    [RIVERA.name, RIVERA, ["My day", "Patients"]],
+    [OKAFOR.name, OKAFOR, ["My day", "Patients"]],
+    [BROOKS.name, BROOKS, ["My day", "Patients"]],
     [ADMIN.name, ADMIN, ["Patients", "Admin"]],
   ])("shows %s only the sections their role can use", async (_name, persona, expected) => {
     renderApp("/patients", { persona });
@@ -124,13 +124,5 @@ describe("route guards", () => {
     renderApp("/admin/audit", { persona: ADMIN });
 
     expect(await screen.findByRole("heading", { level: 1, name: "Audit log" })).toBeInTheDocument();
-  });
-
-  it("keeps admin out of patient registration", async () => {
-    renderApp("/patients/new", { persona: ADMIN });
-
-    expect(
-      await screen.findByRole("heading", { name: "You don't have access to this page" }),
-    ).toBeInTheDocument();
   });
 });

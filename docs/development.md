@@ -44,7 +44,7 @@ creates `.env` on first run. **Never commit `.env`.**
 |---|---|
 | `ENV` | `development` (default), `test`, or `production`. Seeding runs only in `development`. |
 | `DEMO_MODE` | Turns on the persona picker. Refused when `ENV=production` or `ENV` is unset. |
-| `SUMMARY_PROVIDER` | `auto` (Gemini when a key is set, otherwise the mock), `mock`, or `gemini`. |
+| `SUMMARY_PROVIDER` | `auto` (Gemini when a key is set, otherwise the mock), `mock`, `gemini`, or `baa` (the production slot for a BAA-covered provider; refuses to start until implemented). |
 | `GEMINI_API_KEY` | Optional free key from Google AI Studio. Synthetic data only; see [production readiness](security.md#production-readiness). |
 | `CORS_ORIGINS` | Browser origins allowed to call the API (comma-separated; `*` is refused). |
 | `PRACTICE_TIMEZONE` | The practice's IANA timezone; defines "today". Default `America/New_York`. |

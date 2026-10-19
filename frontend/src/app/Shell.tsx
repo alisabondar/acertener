@@ -1,4 +1,5 @@
-import { CalendarDays, LoaderCircle, ScrollText, UserPlus, Users } from "lucide-react";
+import { Toaster } from "@/components/ui/sonner";
+import { CalendarDays, LoaderCircle, ScrollText, Users } from "lucide-react";
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
@@ -28,7 +29,6 @@ const NAV: {
   to: string;
   label: string;
   /** Shown while a persona switch loads this section. */
-  loading: string;
   icon: typeof Users;
   permission: Permission;
   owns: (path: string) => boolean;
@@ -36,7 +36,6 @@ const NAV: {
   {
     to: "/",
     label: "My day",
-    loading: "Loading your day",
     icon: CalendarDays,
     permission: "SCHEDULE_VISITS",
     owns: (path: string) => path === "/",
@@ -44,23 +43,13 @@ const NAV: {
   {
     to: "/patients",
     label: "Patients",
-    loading: "Loading your patients",
     icon: Users,
     permission: "VIEW_DEMOGRAPHICS",
-    owns: (path: string) => path === "/patients" || /^\/patients\/(?!new$)[^/]+/.test(path),
-  },
-  {
-    to: "/patients/new",
-    label: "New patient",
-    loading: "Loading registration",
-    icon: UserPlus,
-    permission: "CREATE_PATIENT",
-    owns: (path: string) => path === "/patients/new",
+    owns: (path: string) => path === "/patients" || path.startsWith("/patients/"),
   },
   {
     to: "/admin/audit",
     label: "Admin",
-    loading: "Loading the audit log",
     icon: ScrollText,
     permission: "VIEW_AUDIT_LOG",
     owns: (path: string) => path.startsWith("/admin"),
@@ -74,6 +63,7 @@ export function Shell() {
   const sections = NAV.filter((item) => me.permissions.includes(item.permission));
   return (
     <TooltipProvider>
+      <Toaster position="bottom-right" />
       <SidebarProvider>
         <Sidebar collapsible="icon">
           <SidebarHeader className="flex-row items-center justify-between px-3 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
@@ -111,10 +101,7 @@ export function Shell() {
           </header>
           <div className="mx-auto w-full max-w-7xl px-8 py-6">
             {switchingTo ? (
-              <SwitchingPersona
-                message={NAV.find((item) => item.owns(path))?.loading ?? "Loading"}
-                personaName={switchingTo.name}
-              />
+              <SwitchingPersona personaName={switchingTo.name} />
             ) : (
               <Suspense fallback={<PageLoading />}>
                 <Outlet />
@@ -128,7 +115,7 @@ export function Shell() {
 }
 
 /** Stands in for the page while a persona switch loads, so nothing from the last one shows. */
-function SwitchingPersona({ message, personaName }: { message: string; personaName: string }) {
+function SwitchingPersona({ personaName }: { personaName: string }) {
   return (
     <div
       role="status"
@@ -137,7 +124,7 @@ function SwitchingPersona({ message, personaName }: { message: string; personaNa
     >
       <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden />
       <p className="text-[15px] font-medium">
-        {message} <span className="text-muted-foreground">as {personaName}</span>
+        Loading your view <span className="text-muted-foreground">as {personaName}</span>
       </p>
     </div>
   );

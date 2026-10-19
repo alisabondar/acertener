@@ -1,5 +1,11 @@
 {
   "age": "70",
+  "allergies": [
+    {
+      "severity": "severe",
+      "substance": "Lisinopril"
+    }
+  ],
   "conditions": [
     {
       "icd10_code": "I10",

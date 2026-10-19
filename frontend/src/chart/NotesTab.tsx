@@ -1,8 +1,11 @@
 import { format, parseISO } from "date-fns";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { z } from "zod";
 
 import { api } from "@/api";
-import { queryKeys, useApiMutation } from "@/api/queries";
+import { queryKeys, setServerErrors, useApiMutation } from "@/api/queries";
 import type { components } from "@/api/schema";
 import { useCurrentUser, usePermission } from "@/auth/context";
 import { Button } from "@/components/ui/button";
@@ -15,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -27,7 +31,7 @@ export function NotesTab({ patientId }: { patientId: string }) {
   const { me } = useCurrentUser();
   const canWrite = usePermission("WRITE_NOTES_AND_VITALS");
   const notes = useChartNotes(patientId, true);
-  // The draft being composed: an existing draft's id once it's been saved.
+  // The draft being opened: a new one, or an existing draft to keep writing.
   const [composing, setComposing] = useState<{ id: string | null; content: string } | null>(null);
   const [deleting, setDeleting] = useState<Note | null>(null);
 
@@ -38,9 +42,9 @@ export function NotesTab({ patientId }: { patientId: string }) {
       )}
       {composing && (
         <Composer
+          key={composing.id ?? "new"}
           patientId={patientId}
           draft={composing}
-          onChange={setComposing}
           onDone={() => setComposing(null)}
         />
       )}
@@ -105,80 +109,111 @@ export function NotesTab({ patientId }: { patientId: string }) {
   );
 }
 
+const noteForm = z.object({ content: z.string() });
+type NoteForm = z.infer<typeof noteForm>;
+
 function Composer({
   patientId,
   draft,
-  onChange,
   onDone,
 }: {
   patientId: string;
   draft: { id: string | null; content: string };
-  onChange: (draft: { id: string | null; content: string }) => void;
   onDone: () => void;
 }) {
+  const form = useForm<NoteForm>({
+    resolver: zodResolver(noteForm),
+    defaultValues: { content: draft.content },
+  });
+  const content = useWatch({ control: form.control, name: "content" });
+  // Set once the draft is first saved; later saves update it rather than creating another.
+  const [noteId, setNoteId] = useState(draft.id);
   const invalidate = [queryKeys.patients.chart(patientId)];
-  // Create the draft the first time, then update it.
   const save = useApiMutation(
-    async (content: string) =>
-      draft.id
+    async (text: string) =>
+      noteId
         ? api.PATCH("/api/v1/notes/{note_id}", {
-            params: { path: { note_id: draft.id } },
-            body: { content },
+            params: { path: { note_id: noteId } },
+            body: { content: text },
           })
         : api.POST("/api/v1/patients/{patient_id}/notes", {
             params: { path: { patient_id: patientId } },
-            body: { content },
+            body: { content: text },
           }),
-    { invalidate },
+    { invalidate, success: "Draft saved" },
   );
   const finalize = useApiMutation(
-    (noteId: string) =>
-      api.POST("/api/v1/notes/{note_id}/finalize", { params: { path: { note_id: noteId } } }),
-    { invalidate },
+    (id: string) =>
+      api.POST("/api/v1/notes/{note_id}/finalize", { params: { path: { note_id: id } } }),
+    { invalidate, success: "Note finalized" },
   );
 
-  const saveDraft = async () => {
-    const saved = await save.mutateAsync(draft.content);
-    if (saved) onChange({ id: saved.id, content: draft.content });
-    return saved;
+  const saveDraft = async (text: string) => {
+    try {
+      const saved = await save.mutateAsync(text);
+      if (saved) setNoteId(saved.id);
+      return saved;
+    } catch (error) {
+      setServerErrors(error, form.setError);
+      throw error;
+    }
   };
+  const onSaveDraft = form.handleSubmit(async ({ content: text }) => {
+    await saveDraft(text).catch(() => {});
+  });
+  const onFinalize = form.handleSubmit(async ({ content: text }) => {
+    try {
+      const saved = await saveDraft(text);
+      if (saved) await finalize.mutateAsync(saved.id);
+      onDone();
+    } catch {
+      // Errors are shown on the field or below it.
+    }
+  });
 
   return (
-    <div className="space-y-3 rounded-xl border bg-card p-4">
-      <Textarea
-        aria-label="Note"
-        value={draft.content}
-        onChange={(event) => onChange({ ...draft, content: event.target.value })}
-        rows={6}
-        placeholder="Subjective, objective, assessment, plan…"
-      />
-      <WriteError error={save.error ?? finalize.error} action="write notes" />
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          disabled={save.isPending}
-          onClick={() => void saveDraft().catch(() => {})}
-        >
-          Save draft
-        </Button>
-        <Button
-          disabled={save.isPending || finalize.isPending || !draft.content.trim()}
-          onClick={() =>
-            void saveDraft()
-              .then(async (saved) => {
-                if (saved) await finalize.mutateAsync(saved.id);
-                onDone();
-              })
-              .catch(() => {})
-          }
-        >
-          Finalize
-        </Button>
-        <Button variant="ghost" onClick={onDone}>
-          Close
-        </Button>
-      </div>
-    </div>
+    <Form {...form}>
+      <form
+        aria-label="Note composer"
+        className="space-y-3 rounded-xl border bg-card p-4"
+        onSubmit={(event) => void onFinalize(event)}
+      >
+        <FormField
+          control={form.control}
+          name="content"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  aria-label="Note"
+                  rows={6}
+                  placeholder="Subjective, objective, assessment, plan…"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <WriteError error={save.error ?? finalize.error} action="write notes" />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={save.isPending}
+            onClick={() => void onSaveDraft()}
+          >
+            Save draft
+          </Button>
+          <Button type="submit" disabled={save.isPending || finalize.isPending || !content.trim()}>
+            Finalize
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Close
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }
 
@@ -194,7 +229,7 @@ function DeleteDraft({
   const remove = useApiMutation(
     (noteId: string) =>
       api.DELETE("/api/v1/notes/{note_id}", { params: { path: { note_id: noteId } } }),
-    { invalidate: [queryKeys.patients.chart(patientId)] },
+    { invalidate: [queryKeys.patients.chart(patientId)], success: "Draft deleted" },
   );
   return (
     <AlertDialog open={note !== null} onOpenChange={(open) => !open && onClose()}>

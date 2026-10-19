@@ -40,12 +40,33 @@ from app.patients.repository import NewPatient, PatientRepository
 SEED = 20261017
 DEFAULT_COUNT = 10_000
 BATCH_SIZE = 1_000
-TODAYS_VISITS = 16
+# Today's visits per persona provider (the nurse persona sees those of her care-team patients),
+# one per hour from 9:00: a clinic day in progress, so My day shows every visit status.
+TODAYS_STATUSES = [
+    "completed",
+    "completed",
+    "completed",
+    "no_show",
+    "checked_in",
+    "scheduled",
+    "scheduled",
+    "scheduled",
+]
+TODAYS_VISITS_EACH = len(TODAYS_STATUSES)
 # Of inactive and deceased patients, the share an administrator has archived.
 ARCHIVED_SHARE_OF_CLOSED = 0.2
 
 
-EXTRA_STAFF = [("provider", "MD"), ("provider", "PA"), ("nurse", "RN"), ("nurse", "MA")]
+# Besides the five personas: a small practice of 12 providers, 8 nurses and MAs, 4 front desk,
+# and 1 admin.
+EXTRA_STAFF = (
+    [("provider", "MD")] * 6
+    + [("provider", "NP")] * 2
+    + [("provider", "PA")] * 2
+    + [("nurse", "RN")] * 4
+    + [("nurse", "MA")] * 3
+    + [("front_desk", None)] * 3
+)
 
 VISIT_REASONS = [
     "Annual physical",
@@ -166,6 +187,7 @@ class _Seeder:
             u for u in extra if u.role == "provider"
         ]
         self.other_nurses = [u for u in extra if u.role == "nurse"]
+        self.todays_visits = {self.chen.id: 0, self.rivera.id: 0}
 
     def patient(self, i: int, count: int) -> None:
         age = self.rng.randint(1, 95)
@@ -204,7 +226,7 @@ class _Seeder:
         elif special == 2:
             visit_days, patient.status = [1825], "inactive"
         elif special == 3:
-            visit_days = [1460]
+            visit_days, patient.status = [1460], "active"
         else:
             visit_days, patient.status = self._panel_mix()
         if patient.status != "active" and self.rng.random() < ARCHIVED_SHARE_OF_CLOSED:
@@ -224,22 +246,29 @@ class _Seeder:
             )
             for d in visit_days
         ]
-        # A realistic day: a handful of today's visits for the persona providers.
+        # A realistic day: a handful of today's visits for each persona provider.
+        booked = self.todays_visits.get(primary.id)
         if (
-            primary in (self.chen, self.rivera)
+            booked is not None
+            and booked < TODAYS_VISITS_EACH
             and patient.status == "active"
             and min(visit_days) < 900
-            and i < min(count * 3 // 5, TODAYS_VISITS)
         ):
-            self.stages[1].append(
-                Visit(
-                    patient_id=patient.id,
-                    provider_id=primary.id,
-                    scheduled_at=self._at(self.today, 9 + (i // 2) % 8, 30 * (i % 2)),
-                    status=self.rng.choice(["scheduled", "scheduled", "checked_in"]),
-                    reason=self.rng.choice(VISIT_REASONS),
-                )
+            self.todays_visits[primary.id] = booked + 1
+            when = self._at(self.today, 9 + booked, 30 * (primary is self.rivera))
+            visit = Visit(
+                id=self._uuid(),
+                patient_id=patient.id,
+                provider_id=primary.id,
+                scheduled_at=when,
+                status=TODAYS_STATUSES[booked],
+                reason=self.rng.choice(VISIT_REASONS),
             )
+            self.stages[1].append(visit)
+            if visit.status == "completed":
+                # Seen this morning: vitals were taken, and today is now the last visit.
+                self._vitals(patient, visit, nurses[0], when)
+                completed.append(when)
         for substance, reaction, severity in self.rng.sample(ALLERGIES, k=self.rng.randint(0, 2)):
             self.stages[2].append(
                 Allergy(
@@ -274,6 +303,23 @@ class _Seeder:
         self.stages[1].append(visit)
         if no_show:
             return None
+        self._vitals(patient, visit, nurse, when)
+        # Up to two notes per visit (the provider's and the nurse's), so 0 to 8 per patient.
+        for author, chance in ((provider, 0.7), (nurse, 0.3)):
+            if self.rng.random() < chance:
+                self.stages[2].append(
+                    Note(
+                        patient_id=patient.id,
+                        author_id=author.id,
+                        encounter_at=when,
+                        content=f"{reason}. Vitals reviewed. {self.rng.choice(NOTE_PLANS)}",
+                        status="final",
+                        finalized_at=when + timedelta(hours=2),
+                    )
+                )
+        return when
+
+    def _vitals(self, patient: Patient, visit: Visit, nurse: User, when: datetime) -> None:
         self.stages[2].append(
             Vital(
                 patient_id=patient.id,
@@ -290,19 +336,6 @@ class _Seeder:
                 height_cm=Decimal(self.rng.randint(1500, 1950)) / 10,
             )
         )
-        if self.rng.random() < 0.7:
-            author = self.rng.choice([provider, nurse])
-            self.stages[2].append(
-                Note(
-                    patient_id=patient.id,
-                    author_id=author.id,
-                    encounter_at=when,
-                    content=f"{reason}. Vitals reviewed. {self.rng.choice(NOTE_PLANS)}",
-                    status="final",
-                    finalized_at=when + timedelta(hours=2),
-                )
-            )
-        return when
 
     async def write_batch(self) -> None:
         for stage in self.stages:

@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.deidentify import (
+    AllergyRecord,
     ChartRecords,
     ConditionRecord,
     NoteRecord,
@@ -76,6 +77,7 @@ async def chart_inputs(
     )
     vitals = await session.scalars(select(Vital).where(Vital.patient_id == patient_id))
     conditions = await session.scalars(select(Condition).where(Condition.patient_id == patient_id))
+    allergies = await session.scalars(select(Allergy).where(Allergy.patient_id == patient_id))
     records = ChartRecords(
         sex=patient.gender,
         visits=[VisitRecord(v.scheduled_at, v.reason, v.status) for v in visits],
@@ -95,6 +97,7 @@ async def chart_inputs(
             for v in vitals
         ],
         conditions=[ConditionRecord(c.icd10_code, c.name, c.status) for c in conditions],
+        allergies=[AllergyRecord(a.substance, a.severity, a.status) for a in allergies],
     )
     return ids, records
 
@@ -110,7 +113,10 @@ class SummaryService:
         self._session = session
         self._debounce = debounce
 
-    async def header(self, patient_id: uuid.UUID) -> tuple[list[Allergy], list[Condition]]:
+    async def header(self, patient_id: uuid.UUID) -> tuple[Patient, list[Allergy], list[Condition]]:
+        patient = await self._session.get(Patient, patient_id)
+        if patient is None:
+            raise PatientNotFoundError
         allergies = await self._session.scalars(
             select(Allergy).where(Allergy.patient_id == patient_id, Allergy.status == "active")
         )
@@ -119,7 +125,7 @@ class SummaryService:
                 Condition.patient_id == patient_id, Condition.status == "active"
             )
         )
-        return list(allergies), list(conditions)
+        return patient, list(allergies), list(conditions)
 
     async def view(self, patient_id: uuid.UUID) -> SummaryState:
         """The cached summary, claiming a background generation if it's due."""

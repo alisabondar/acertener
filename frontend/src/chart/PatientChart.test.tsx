@@ -175,6 +175,7 @@ describe("notes", () => {
       ]),
     );
     expect(writes[0]?.body).toEqual({ content: "Seen for BP check." });
+    expect(await screen.findByText("Note finalized")).toBeInTheDocument();
   });
 
   it("offers delete only on my own drafts, after a confirmation", async () => {
@@ -195,6 +196,31 @@ describe("notes", () => {
       expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual(["DELETE /api/v1/notes/mine"]),
     );
   });
+});
+
+it("shows the API's field error on the note itself", async () => {
+  const user = userEvent.setup();
+  chartIs();
+  server.use(
+    http.post(`${base}/notes`, () =>
+      HttpResponse.json(
+        makeProblem(422, "VALIDATION_FAILED", {
+          errors: { content: "String should have at most 20000 characters" },
+        }),
+        { status: 422 },
+      ),
+    ),
+  );
+  open();
+  await user.click(await screen.findByRole("tab", { name: "Notes" }));
+
+  await user.click(await screen.findByRole("button", { name: "New note" }));
+  await user.type(screen.getByRole("textbox", { name: "Note" }), "Too long, say.");
+  await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+  expect(await screen.findByRole("textbox", { name: "Note" })).toHaveAccessibleDescription(
+    "String should have at most 20000 characters",
+  );
 });
 
 describe("vitals", () => {

@@ -111,9 +111,20 @@ def _identifier_hits(text: str, ids: PatientIdentifiers) -> set[str]:
     return hits
 
 
-def leak_check(text: str, ids: PatientIdentifiers) -> LeakResult:
+def leak_check(
+    text: str, ids: PatientIdentifiers, clinical_terms: frozenset[str] = frozenset()
+) -> LeakResult:
+    """Every detector that fires on `text`; empty means nothing identifying was found.
+
+    `clinical_terms` are the chart's own allergy and condition names (already scrubbed). The name
+    detector can read a bare drug like "Lisinopril" as a person, so a detected name made only of
+    those words is skipped. The exact checks for this patient's identifiers still run first.
+    """
     hits = _identifier_hits(text, ids)
     hits |= {name for name, pattern in _GENERIC.items() if pattern.search(text)}
-    for _, _, kind in find_entities(text, ("PERSON", "LOCATION")):
+    known = {word.casefold() for term in clinical_terms for word in term.split()}
+    for start, end, kind in find_entities(text, ("PERSON", "LOCATION")):
+        if known and all(word.casefold() in known for word in text[start:end].split()):
+            continue
         hits.add("person_name" if kind == "PERSON" else "location")
     return LeakResult(tuple(sorted(hits)))

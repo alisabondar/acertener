@@ -31,3 +31,14 @@ def test_skips_weak_hits_redaction_tokens_and_medical_eponyms(
     monkeypatch.setattr(nlp, "_analyzer", FakeAnalyzer)
 
     assert nlp.find_entities(text, ("PERSON",)) == [(39, 53, "PERSON")]
+
+
+def test_warming_up_builds_the_analyzer_before_the_first_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    built: list[object] = []
+    monkeypatch.setattr(nlp, "_analyzer", lambda: built.append("analyzer"))
+
+    nlp.warm_up()
+
+    assert built == ["analyzer"]

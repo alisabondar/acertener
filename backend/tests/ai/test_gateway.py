@@ -6,6 +6,7 @@ import httpx2
 import pytest
 
 from app.ai.deidentify import (
+    AllergyRecord,
     ChartRecords,
     ConditionRecord,
     NoteRecord,
@@ -20,9 +21,11 @@ from app.ai.gateway import (
     Gateway,
     GeminiProvider,
     MockProvider,
+    Provider,
     RateLimited,
     Summary,
     TokenBucket,
+    gateway_from_settings,
 )
 from app.ai.identifiers import PatientIdentifiers
 from app.ai.payload import DeidentifiedClinicalContext
@@ -142,7 +145,7 @@ async def test_notes_are_data_not_instructions(ids: PatientIdentifiers) -> None:
     assert "one-line summary" in system
     assert "abnormal" in system
     assert "visit by visit" in system
-    assert "80 words" in system
+    assert "90 words" in system
     assert user.startswith("<chart>")
     assert user.rstrip().endswith("</chart>")
     assert "Ignore all previous instructions" not in system
@@ -206,6 +209,7 @@ async def test_the_mock_provider_writes_a_realistic_summary_without_a_network(
             )
         ],
         conditions=[ConditionRecord("I10", "Hypertension", "active")],
+        allergies=[AllergyRecord("Lisinopril", "severe", "active")],
     )
 
     result = await Gateway(MockProvider()).summarize(build_context(ids, records, TODAY), ids)
@@ -215,6 +219,7 @@ async def test_the_mock_provider_writes_a_realistic_summary_without_a_network(
     assert result.narrative.startswith("70-year-old female with Hypertension.")
     assert "Last visit 7 days ago (Cough)" in result.narrative
     assert "Most recent BP 142/88" in result.narrative
+    assert "Allergies: Lisinopril (severe)." in result.narrative
     assert result.narrative.endswith("No finalized notes yet.")
 
 
@@ -299,3 +304,25 @@ async def test_logs_why_the_provider_refused_without_its_message(
         "category": "NOT_FOUND",
     }
     assert "Rose" not in str(record.__dict__)
+
+
+@pytest.mark.parametrize(
+    ("provider", "api_key", "expected"),
+    [
+        ("auto", None, MockProvider),
+        ("auto", "a-key", GeminiProvider),
+        ("mock", "a-key", MockProvider),
+        ("gemini", "a-key", GeminiProvider),
+    ],
+)
+def test_settings_choose_the_provider(
+    provider: str, api_key: str | None, expected: type[Provider]
+) -> None:
+    gateway = gateway_from_settings(provider, api_key, "a-model", per_minute=10)
+
+    assert isinstance(gateway.provider, expected)
+
+
+def test_the_baa_provider_refuses_to_start_until_it_is_configured() -> None:
+    with pytest.raises(RuntimeError, match="BAA"):
+        gateway_from_settings("baa", None, "a-model", per_minute=10)

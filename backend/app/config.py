@@ -27,7 +27,8 @@ class Settings(BaseSettings):
         return value
 
     # AI summaries: "auto" uses Gemini when a key is set, otherwise the deterministic mock.
-    summary_provider: Literal["auto", "mock", "gemini"] = "auto"
+    # "baa" is the slot for a BAA-covered production provider; it refuses to start until built.
+    summary_provider: Literal["auto", "mock", "gemini", "baa"] = "auto"
     gemini_api_key: SecretStr | None = None
     # Google keeps this alias on its current Flash model, so a retired version can't break us.
     gemini_model: str = "gemini-flash-latest"

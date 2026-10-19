@@ -1,40 +1,56 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import type { ComponentProps } from "react";
+import { memo, Profiler, type ComponentProps, type ProfilerOnRenderCallback } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { makePage, makePatient } from "@/test/factories";
 import { server } from "@/test/msw/server";
 import { renderApp } from "@/test/render";
 
-const rowRenders = vi.hoisted(() => ({ count: 0 }));
+const commits = vi.hoisted(() => ({ list: [] as { phase: string; duration: number }[] }));
 
-// Count how often table rows render, to catch work the user's typing shouldn't cause.
-vi.mock("@/components/ui/table", async (importOriginal) => {
-  const table = await importOriginal<typeof import("@/components/ui/table")>();
+// React's Profiler around the patient table: every commit of the table's tree is recorded, with
+// how long it took. The wrapper is memoized like the table, so it adds no renders of its own.
+vi.mock("@/patients/PatientTable", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/patients/PatientTable")>();
+  const record: ProfilerOnRenderCallback = (_id, phase, actualDuration) => {
+    commits.list.push({ phase, duration: actualDuration });
+  };
   return {
-    ...table,
-    TableRow: (props: ComponentProps<typeof table.TableRow>) => {
-      rowRenders.count += 1;
-      return <table.TableRow {...props} />;
-    },
+    ...original,
+    PatientTable: memo((props: ComponentProps<typeof original.PatientTable>) => (
+      <Profiler id="patient-table" onRender={record}>
+        <original.PatientTable {...props} />
+      </Profiler>
+    )),
   };
 });
 
-describe("patient list performance", () => {
+describe("patient list performance (React Profiler)", () => {
   it("doesn't re-render the table on each keystroke, only when results change", async () => {
     const user = userEvent.setup();
     const page = Array.from({ length: 20 }, () => makePatient());
-    server.use(http.get("/api/v1/patients", () => HttpResponse.json(makePage(page))));
+    server.use(
+      http.get("/api/v1/patients", () => HttpResponse.json(makePage(page))),
+      http.post("/api/v1/patients/search", () =>
+        HttpResponse.json(makePage([makePatient({ last_name: "Osei" })])),
+      ),
+    );
     renderApp("/patients");
     await screen.findAllByRole("row", { name: /MRN-/ });
+    // Count only after the first load settles: the filter counts arrive separately.
+    await screen.findByRole("button", { name: /^Active \d/ });
     const box = screen.getByRole("searchbox", { name: "Search patients" });
-    rowRenders.count = 0;
+    commits.list = [];
 
     // Two letters: below the search threshold, so the results can't change.
     await user.type(box, "os");
+    expect(commits.list).toEqual([]);
 
-    expect(rowRenders.count).toBe(0);
+    // The third letter searches, and the new results are the table's first commit since.
+    await user.type(box, "e");
+    await screen.findByRole("row", { name: /Osei/ });
+    expect(commits.list.length).toBeGreaterThan(0);
   });
 });

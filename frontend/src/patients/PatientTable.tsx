@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDob } from "@/lib/format";
+import { usePermission } from "@/auth/context";
 import { cn } from "@/lib/utils";
 
 import { StatusPill } from "./StatusPill";
@@ -38,6 +39,8 @@ export const PatientTable = memo(function PatientTable({
   refreshing: boolean;
 }) {
   const navigate = useNavigate();
+  // Problems are clinical data: the API sends them only to roles that may view them.
+  const showProblems = usePermission("VIEW_CLINICAL");
   const open = (patient: Patient) => void navigate(`/patients/${patient.id}`);
   const sortBy = (sort: Sort) =>
     setParams(
@@ -69,7 +72,7 @@ export const PatientTable = memo(function PatientTable({
               params={params}
               onSort={sortBy}
             />
-            <TableHead>Status</TableHead>
+            {showProblems && <TableHead>Active problems</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -91,7 +94,11 @@ export const PatientTable = memo(function PatientTable({
                   {showCareTeam && patient.on_my_care_team && (
                     <Tag className="bg-primary text-primary-foreground">My patient</Tag>
                   )}
+                  {patient.status !== "active" && <StatusPill status={patient.status} />}
                   {patient.archived && <Tag>Archived</Tag>}
+                  {patient.inactivity_suggested && (
+                    <span className="text-[12px] text-muted-foreground">No visit in 3+ years</span>
+                  )}
                 </div>
                 <div className="text-[12px] text-muted-foreground tabular-nums">{patient.mrn}</div>
               </TableCell>
@@ -102,14 +109,11 @@ export const PatientTable = memo(function PatientTable({
               <TableCell>
                 <LastVisit at={patient.last_visit_at} />
               </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap items-center gap-2">
-                  {patient.status !== "active" && <StatusPill status={patient.status} />}
-                  {patient.inactivity_suggested && (
-                    <span className="text-[12px] text-muted-foreground">No visit in 3+ years</span>
-                  )}
-                </div>
-              </TableCell>
+              {showProblems && (
+                <TableCell className="max-w-64 text-[13px]">
+                  <Problems names={patient.active_problems ?? []} />
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -188,6 +192,19 @@ function Tag({ children, className }: { children: string; className?: string }) 
       )}
     >
       {children}
+    </span>
+  );
+}
+
+/** The first two active problems, then a count of the rest. */
+function Problems({ names }: { names: string[] }) {
+  if (names.length === 0) return <span className="text-muted-foreground">None</span>;
+  const shown = names.slice(0, 2).join(", ");
+  const more = names.length - 2;
+  return (
+    <span title={names.join(", ")}>
+      {shown}
+      {more > 0 && <span className="text-muted-foreground"> +{more} more</span>}
     </span>
   );
 }

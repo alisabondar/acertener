@@ -77,7 +77,7 @@ cd backend && uv run python -m scripts.time_endpoints       # API latency, needs
 
 ### Frontend
 
-- **Typing in search:** each keystroke re-rendered the whole table (42 row renders for two letters on a 20-row page). `PatientTable` is now memoized, so typing renders no rows until results change; a regression test (`PatientList.perf.test.tsx`) keeps it that way.
+- **Typing in search:** each keystroke re-rendered the whole table (42 row renders for two letters on a 20-row page). `PatientTable` is now memoized, so typing renders no rows until results change. `PatientList.perf.test.tsx` keeps it that way with React's `<Profiler>` around the table: zero table commits while typing below the search threshold, and a commit once a search changes the results (removing the memo makes it fail).
 - **Stale requests:** typing is debounced 300 ms and superseded searches are aborted; clearing applies at once.
 - **Next page:** prefetched in the background, so Next shows rows without a request.
 - **Bundle:** one 630 kB chunk (199 kB gzip) before; pages now load on first visit (`React.lazy`), so the first screen downloads 515 kB (165 kB gzip). The patient list (11 kB) and My day (6 kB) load on demand, sharing a 99 kB search chunk (date-fns and the search fields).
@@ -120,6 +120,17 @@ connection; `tests/db/test_session_scope.py` keeps that order.
 
 The slowest single request was a search at 536 ms; with a p99 of 200 ms that's an outlier, most
 likely one process's event loop busy decrypting another user's page.
+
+## Encryption overhead (decrypting one list page)
+
+`uv run python -m scripts.time_decryption` decrypts 500 list pages of 20 patients, every encrypted
+field a row uses (first and last name, MRN, DOB, gender: 100 values a page), with the app's cipher.
+
+| | p50 | p95 |
+|---|---|---|
+| Decrypt one page | 0.52 ms | 0.59 ms |
+
+Under 1% of the list's 83 ms p95 under load: encryption isn't what a slow page would be waiting on.
 
 ## Next measurement
 

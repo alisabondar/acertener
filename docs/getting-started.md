@@ -3,7 +3,7 @@
 **Docker is the only prerequisite.**
 
 ```bash
-git clone <repo-url> patient-dashboard && cd patient-dashboard && ./dev.sh
+git clone https://github.com/alisabondar/acertener.git && cd acertener && ./dev.sh
 ```
 
 The first run builds the images, generates encryption keys, and seeds 10,000 synthetic patients

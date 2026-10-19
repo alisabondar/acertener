@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime, time
-from typing import Any
+from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import func, select
@@ -8,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.crypto import FieldCipher
 from app.db.models import CareTeamMember, Note, Patient, User, Visit, Vital
 from app.demo.personas import PERSONAS
-from scripts.seed import require_development, seed
+from app.schemas.patients import Scope
+from app.visits.queries import todays_visits
+from scripts.seed import _Seeder, require_development, seed
 
 TODAY = date(2026, 10, 17)
 SMALL = 20  # the default is 10,000; tests stay small
@@ -189,3 +192,87 @@ async def test_status_mix_patients_always_have_a_last_visit(
     unseen = await db_session.scalars(select(Patient.mrn).where(Patient.last_visit_at.is_(None)))
 
     assert list(unseen) == []
+
+
+@pytest.mark.db
+@pytest.mark.anyio
+async def test_staff_match_a_small_practice(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    await seed(db_session, field_cipher, count=SMALL, today=TODAY)
+
+    roles = dict(
+        (await db_session.execute(select(User.role, func.count()).group_by(User.role))).all()
+    )
+
+    assert roles == {"provider": 12, "nurse": 8, "front_desk": 4, "admin": 1}
+
+
+@pytest.mark.db
+@pytest.mark.anyio
+async def test_each_clinical_persona_has_several_of_todays_visits(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    tz = ZoneInfo("America/New_York")
+    await seed(db_session, field_cipher, count=200, today=TODAY, tz=tz)
+    users = {u.email: u for u in await db_session.scalars(select(User))}
+
+    for email in ("chen@demo.clinic", "rivera@demo.clinic", "okafor@demo.clinic"):
+        visits = await todays_visits(db_session, users[email], Scope.MY, TODAY, tz)
+        assert len(visits) >= 3, email
+
+
+@pytest.mark.db
+@pytest.mark.anyio
+async def test_patients_have_zero_to_eight_final_notes(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    await seed(db_session, field_cipher, count=200, today=TODAY)
+
+    per_patient = (
+        await db_session.scalars(
+            select(func.count(Note.id)).select_from(Patient).outerjoin(Note).group_by(Patient.id)
+        )
+    ).all()
+
+    assert min(per_patient) == 0
+    assert 4 < max(per_patient) <= 8
+
+
+class _NoDatabase:
+    """Lets the seeder build rows in memory without writing them anywhere."""
+
+    def add_all(self, rows: object) -> None:
+        pass
+
+    async def flush(self) -> None:
+        pass
+
+
+@pytest.mark.anyio
+async def test_every_patient_gets_an_explicit_status_before_archiving_is_decided(
+    field_cipher: FieldCipher,
+) -> None:
+    """A status left to the database default reads as None here, which isn't "active"."""
+    seeder = _Seeder(cast(AsyncSession, _NoDatabase()), field_cipher, TODAY, UTC)
+    await seeder.staff()
+    for i in range(1000):
+        seeder.patient(i, 1000)
+
+    patients = [row for row in seeder.stages[0] if isinstance(row, Patient)]
+    assert all(p.status in ("active", "inactive", "deceased") for p in patients)
+
+
+@pytest.mark.db
+@pytest.mark.anyio
+async def test_each_provider_persona_has_every_visit_status_today(
+    db_session: AsyncSession, field_cipher: FieldCipher
+) -> None:
+    tz = ZoneInfo("America/New_York")
+    await seed(db_session, field_cipher, count=200, today=TODAY, tz=tz)
+    users = {u.email: u for u in await db_session.scalars(select(User))}
+
+    for email in ("chen@demo.clinic", "rivera@demo.clinic"):
+        visits = await todays_visits(db_session, users[email], Scope.MY, TODAY, tz)
+        statuses = {v.visit.status for v in visits if v.visit.provider_id == users[email].id}
+        assert statuses == {"completed", "no_show", "checked_in", "scheduled"}, email

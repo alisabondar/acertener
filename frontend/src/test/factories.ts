@@ -66,6 +66,7 @@ export function makePatient(overrides: Partial<PatientListItem> = {}): PatientLi
     archived: false,
     on_my_care_team: true,
     inactivity_suggested: false,
+    active_problems: [],
     ...overrides,
   };
 }

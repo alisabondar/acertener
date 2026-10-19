@@ -10,6 +10,9 @@ export default defineConfig({
   // Personas share one seeded database, so specs run one at a time in a fixed order.
   workers: 1,
   retries: process.env.CI ? 1 : 0,
+  // The Vite dev server compiles each page (and pre-bundles new dependencies) on first visit, which
+  // can take longer than the default 5 s right after a restart.
+  expect: { timeout: 15_000 },
   reporter: [["list"]],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",

@@ -1,8 +1,17 @@
 import { MoreHorizontal } from "lucide-react";
-import { useId, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import {
+  useForm,
+  useWatch,
+  type FieldValues,
+  type Path,
+  type UseFormReturn,
+} from "react-hook-form";
+import { z } from "zod";
 
 import { api } from "@/api";
-import { fieldErrors, queryKeys, useApiMutation } from "@/api/queries";
+import { queryKeys, setServerErrors, useApiMutation } from "@/api/queries";
 import type { components } from "@/api/schema";
 import { usePermission } from "@/auth/context";
 import { Button } from "@/components/ui/button";
@@ -12,6 +21,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -183,148 +200,143 @@ function EntryList({
   );
 }
 
+const allergyForm = z.object({
+  substance: z.string().trim().min(1),
+  reaction: z.string(),
+  severity: z.enum(["", "mild", "moderate", "severe"]),
+});
+type AllergyForm = z.infer<typeof allergyForm>;
+
 function AddAllergy({ patientId }: { patientId: string }) {
-  const [substance, setSubstance] = useState("");
-  const [reaction, setReaction] = useState("");
-  const [severity, setSeverity] = useState<"" | "mild" | "moderate" | "severe">("");
+  const form = useForm<AllergyForm>({
+    resolver: zodResolver(allergyForm),
+    defaultValues: { substance: "", reaction: "", severity: "" },
+  });
   const add = useApiMutation(
     (body: components["schemas"]["AllergyCreate"]) =>
       api.POST("/api/v1/patients/{patient_id}/allergies", {
         params: { path: { patient_id: patientId } },
         body,
       }),
-    { invalidate: [queryKeys.patients.chart(patientId)] },
+    { invalidate: [queryKeys.patients.chart(patientId)], success: "Allergy added" },
   );
-  const errors = fieldErrors(add.error);
+  const substance = useWatch({ control: form.control, name: "substance" });
+  const submit = form.handleSubmit(async ({ substance, reaction, severity }) => {
+    try {
+      await add.mutateAsync({ substance, reaction: reaction || null, severity: severity || null });
+      form.reset();
+    } catch (error) {
+      setServerErrors(error, form.setError);
+    }
+  });
   return (
-    <form
-      aria-label="Add allergy"
-      className="space-y-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void add
-          .mutateAsync({ substance, reaction: reaction || null, severity: severity || null })
-          .then(() => {
-            setSubstance("");
-            setReaction("");
-            setSeverity("");
-          })
-          .catch(() => {});
-      }}
-    >
-      <div className="flex flex-wrap gap-2">
-        <Field
-          label="Substance"
-          value={substance}
-          onChange={setSubstance}
-          error={errors["substance"]}
-          required
-        />
-        <Field
-          label="Reaction"
-          value={reaction}
-          onChange={setReaction}
-          error={errors["reaction"]}
-        />
-        <label className="space-y-1 text-[13px] text-muted-foreground">
-          <span className="block">Severity</span>
-          <select
-            value={severity}
-            onChange={(event) => setSeverity(event.target.value as typeof severity)}
-            className="h-8 rounded-lg border bg-card px-2 text-[14px] text-foreground"
-          >
-            <option value="">Unknown</option>
-            <option value="mild">Mild</option>
-            <option value="moderate">Moderate</option>
-            <option value="severe">Severe</option>
-          </select>
-        </label>
-      </div>
-      <WriteError error={add.error} action="add allergies" />
-      <Button type="submit" size="sm" disabled={add.isPending || !substance.trim()}>
-        Add allergy
-      </Button>
-    </form>
+    <Form {...form}>
+      <form aria-label="Add allergy" className="space-y-2" onSubmit={(event) => void submit(event)}>
+        <div className="flex flex-wrap gap-2">
+          <TextField form={form} name="substance" label="Substance" required />
+          <TextField form={form} name="reaction" label="Reaction" />
+          <FormField
+            control={form.control}
+            name="severity"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Severity</FormLabel>
+                <FormControl>
+                  <select
+                    {...field}
+                    className="h-8 rounded-lg border bg-card px-2 text-[14px] text-foreground"
+                  >
+                    <option value="">Unknown</option>
+                    <option value="mild">Mild</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="severe">Severe</option>
+                  </select>
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+        <WriteError error={add.error} action="add allergies" />
+        <Button type="submit" size="sm" disabled={add.isPending || !substance.trim()}>
+          Add allergy
+        </Button>
+      </form>
+    </Form>
   );
 }
 
+const conditionForm = z.object({
+  icd10_code: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+});
+type ConditionForm = z.infer<typeof conditionForm>;
+
 function AddCondition({ patientId }: { patientId: string }) {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
+  const form = useForm<ConditionForm>({
+    resolver: zodResolver(conditionForm),
+    defaultValues: { icd10_code: "", name: "" },
+  });
   const add = useApiMutation(
     (body: components["schemas"]["ConditionCreate"]) =>
       api.POST("/api/v1/patients/{patient_id}/conditions", {
         params: { path: { patient_id: patientId } },
         body,
       }),
-    { invalidate: [queryKeys.patients.chart(patientId)] },
+    { invalidate: [queryKeys.patients.chart(patientId)], success: "Condition added" },
   );
-  const errors = fieldErrors(add.error);
+  const submit = form.handleSubmit(async (values) => {
+    try {
+      await add.mutateAsync(values);
+      form.reset();
+    } catch (error) {
+      setServerErrors(error, form.setError);
+    }
+  });
+  const [code, name] = useWatch({ control: form.control, name: ["icd10_code", "name"] });
   return (
-    <form
-      aria-label="Add condition"
-      className="space-y-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void add
-          .mutateAsync({ icd10_code: code, name })
-          .then(() => {
-            setCode("");
-            setName("");
-          })
-          .catch(() => {});
-      }}
-    >
-      <div className="flex flex-wrap gap-2">
-        <Field
-          label="ICD-10 code"
-          value={code}
-          onChange={setCode}
-          error={errors["icd10_code"]}
-          required
-        />
-        <Field label="Condition" value={name} onChange={setName} error={errors["name"]} required />
-      </div>
-      <WriteError error={add.error} action="add conditions" />
-      <Button type="submit" size="sm" disabled={add.isPending || !code.trim() || !name.trim()}>
-        Add condition
-      </Button>
-    </form>
+    <Form {...form}>
+      <form
+        aria-label="Add condition"
+        className="space-y-2"
+        onSubmit={(event) => void submit(event)}
+      >
+        <div className="flex flex-wrap gap-2">
+          <TextField form={form} name="icd10_code" label="ICD-10 code" required />
+          <TextField form={form} name="name" label="Condition" required />
+        </div>
+        <WriteError error={add.error} action="add conditions" />
+        <Button type="submit" size="sm" disabled={add.isPending || !code.trim() || !name.trim()}>
+          Add condition
+        </Button>
+      </form>
+    </Form>
   );
 }
 
-function Field({
+function TextField<T extends FieldValues>({
+  form,
+  name,
   label,
-  value,
-  onChange,
-  error,
   required,
 }: {
+  form: UseFormReturn<T>;
+  name: Path<T>;
   label: string;
-  value: string;
-  onChange: (value: string) => void;
-  error: string | undefined;
   required?: boolean;
 }) {
-  const id = useId();
   return (
-    <div>
-      <label className="space-y-1 text-[13px] text-muted-foreground">
-        <span className="block">{label}</span>
-        <Input
-          value={value}
-          required={required}
-          aria-invalid={error !== undefined}
-          aria-describedby={error ? id : undefined}
-          onChange={(event) => onChange(event.target.value)}
-          className="w-44 bg-card text-foreground"
-        />
-      </label>
-      {error && (
-        <p id={id} className="mt-1 text-[12px] text-severe">
-          {error}
-        </p>
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <FormControl>
+            <Input {...field} required={required} className="w-44 bg-card text-foreground" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
       )}
-    </div>
+    />
   );
 }

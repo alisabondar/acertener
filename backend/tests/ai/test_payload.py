@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.ai.deidentify import (
+    AllergyRecord,
     ChartRecords,
     ConditionRecord,
     NoteRecord,
@@ -47,6 +48,10 @@ def _records() -> ChartRecords:
             ConditionRecord("I10", "Essential hypertension", "active"),
             ConditionRecord("J45.909", "Asthma", "entered_in_error"),
         ],
+        allergies=[
+            AllergyRecord("Lisinopril", "severe", "active"),
+            AllergyRecord("Latex", "mild", "resolved"),
+        ],
     )
 
 
@@ -60,6 +65,8 @@ def test_holds_only_de_identified_clinical_context(ids: PatientIdentifiers) -> N
         "[PATIENT] seen with [CLINICIAN]. Cough since [DATE -17d]. Call [REDACTED]."
     ]
     assert [c.icd10_code for c in context.conditions] == ["I10"]
+    # Active allergies only, as substance and severity: what a summary needs to flag a risk.
+    assert [(a.substance, a.severity) for a in context.allergies] == [("Lisinopril", "severe")]
     assert leak_check(context.model_dump_json(), ids).ok
 
 
@@ -72,7 +79,7 @@ def test_ages_over_89_are_sent_as_90_plus(ids: PatientIdentifiers) -> None:
 def test_cannot_be_built_except_by_the_de_identifier() -> None:
     with pytest.raises(ValidationError):
         DeidentifiedClinicalContext(
-            age="40", sex=None, visits=[], notes=[], vitals=[], conditions=[]
+            age="40", sex=None, visits=[], notes=[], vitals=[], conditions=[], allergies=[]
         )
 
 

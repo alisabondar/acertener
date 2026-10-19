@@ -99,7 +99,20 @@ reset() {
 # Half the cores: the container shares them with the running API, database, and dev server,
 # and Vitest otherwise starts a worker per core and its slowest tests run out of time.
 frontend_tests() {
-  compose run --build --rm --no-deps web bun run check --maxWorkers=50%
+  compose run --build --rm --no-deps web \
+    sh -c "bun install --frozen-lockfile && bun run check --maxWorkers=50%"
+}
+
+# The mock AI keeps runs deterministic and never spends a real key's quota. The API is recreated
+# with it for the run, then put back on the .env provider whether the tests pass or not.
+e2e_tests() {
+  start
+  local status=0
+  SUMMARY_PROVIDER=mock compose up -d --force-recreate --no-deps --wait api
+  # --no-deps: start() brought web up; resolving deps again would recreate the API without the mock.
+  compose --profile test run --rm --no-deps e2e || status=$?
+  compose up -d --force-recreate --no-deps --wait api
+  return "$status"
 }
 
 run_tests() {
@@ -110,10 +123,7 @@ run_tests() {
     backend) compose run --build --rm --no-deps api pytest ;;
     privacy) compose run --build --rm --no-deps api pytest -m privacy ;;
     frontend) frontend_tests ;;
-    e2e)
-      start
-      compose --profile test run --rm e2e
-      ;;
+    e2e) e2e_tests ;;
     all)
       compose run --build --rm --no-deps api pytest
       frontend_tests

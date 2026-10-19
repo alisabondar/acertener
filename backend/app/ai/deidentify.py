@@ -47,12 +47,20 @@ class ConditionRecord:
 
 
 @dataclass(frozen=True)
+class AllergyRecord:
+    substance: str
+    severity: str | None
+    status: str
+
+
+@dataclass(frozen=True)
 class ChartRecords:
     sex: str | None
     visits: list[VisitRecord] = field(default_factory=list)
     notes: list[NoteRecord] = field(default_factory=list)
     vitals: list[VitalsRecord] = field(default_factory=list)
     conditions: list[ConditionRecord] = field(default_factory=list)
+    allergies: list[AllergyRecord] = field(default_factory=list)
 
 
 def _age(dob: date, today: date) -> str:
@@ -106,6 +114,12 @@ def build_context(
             {"icd10_code": c.icd10_code, "name": scrub(c.name, ids, today), "status": c.status}
             for c in chart.conditions
             if c.status in ("active", "resolved")
+        ],
+        # Active allergies as substance and severity only, so a summary can flag a relevant risk.
+        "allergies": [
+            {"substance": scrub(a.substance, ids, today), "severity": a.severity}
+            for a in chart.allergies
+            if a.status == "active"
         ],
     }
     return DeidentifiedClinicalContext.model_validate(data, context=seal())

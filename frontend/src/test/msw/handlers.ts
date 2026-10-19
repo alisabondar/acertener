@@ -33,7 +33,7 @@ export const handlers = [
   http.get("/api/v1/patients/:patientId/conditions", () => HttpResponse.json({ items: [] })),
   http.get("/api/v1/patients/:patientId/summary", () =>
     HttpResponse.json({
-      header: { allergies: [], conditions: [] },
+      header: { first_name: "Daniel", last_name: "Osei", age: 52, allergies: [], conditions: [] },
       status: "fresh",
       narrative: "A summary of the chart.",
       is_ai_generated: true,

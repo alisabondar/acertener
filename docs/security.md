@@ -6,26 +6,29 @@ a managed key service controlled by the practice.
 
 **Built in this demo, and how to check it:**
 
-| Control | Verify |
-|---|---|
-| Field-level encryption (Fernet behind one `FieldCipher` interface, `v1:`-tagged values) | `./dev.sh proof`; CI's `test_no_plaintext_phi_at_rest` |
-| Encrypted search (HMAC prefix and DOB fingerprints, separate key) | Search in the UI, then look at `patients.last_name_fp`: hashes only |
-| Server-enforced identity and permissions | `curl -i localhost:8000/api/v1/auth/me` without `X-Persona` returns `401`; permission-matrix tests |
-| Append-only audit trail of every view and change | A chart's Access history tab; the admin audit log |
-| No PHI in URLs, logs, or error bodies | `./dev.sh test privacy` |
-| AI leak check, fail closed | `./dev.sh test privacy`; payload preview: `GET /api/v1/dev/patients/{id}/ai-payload` (demo mode) |
-| Security headers (`no-store` on PHI, CSP, `nosniff`, no referrer) | `curl -I localhost:8000/api/v1/patients` |
+| Control | In plain English | How a reviewer verifies it |
+|---|---|---|
+| **Field-level encryption** | The app scrambles patient details before saving them. The database only ever holds unreadable data. | `./dev.sh proof` shows the app's view next to the raw database row, then searches the whole database for the patient's name and finds 0 matches. |
+| **Encrypted search** (fingerprints) | Search uses one-way fingerprints of name prefixes and DOB, so you can find a patient without storing their name readably. | Search in the UI, then look at `patients.last_name_fp`: it holds only hashes. |
+| **Demo identity, server-enforced** | No login in the demo: a persona picker chooses who you are, but every permission is still checked on the server. It only works in demo mode. | Persona tests, and `curl /api/v1/auth/me` without `X-Persona` (or with `DEMO_MODE=false`) returns `401`. |
+| **No PHI in URLs or logs** | Names and DOBs never appear in web addresses, browser history, or log files. | Canary log test. Check browser history after a search. |
+| **Role permissions + audit trail** | Each role can do only its allowed actions, and every view and edit is recorded. | Permission-matrix tests, the role switcher, and the Access history tab. |
+| **AI leak check** | Nothing identifying is ever sent to the AI. A suspected leak blocks the request. | The payload preview, `GET /api/v1/dev/patients/{id}/ai-payload` (demo mode, never calls the AI), and `./dev.sh test privacy`. |
+| **Security headers** | Tell the browser not to cache patient data, among other things. | `curl -I http://localhost:8000/api/v1/patients`. |
 
 **Production only (designed for, not switched on in the demo):**
 
-| Control | In production |
-|---|---|
-| HTTPS (TLS 1.2+) and HSTS | TLS at the load balancer; the HSTS header turns on when `ENV=production`. |
-| Encrypted database connection | Managed Postgres with `sslmode=verify-full`. |
-| Managed keys | A KMS-backed `FieldCipher` (AWS KMS, GCP KMS, or Vault), ideally with the practice holding the key. |
-| Disk and backup encryption | Turned on in the managed database. |
-| Login, sessions, CSRF, SSO, MFA | Short-lived server sessions or an identity provider, behind the single `current_user` seam. |
-| Key rotation | MultiFernet already reads old keys; add a re-encryption job. |
+| Control | Why it isn't active in the demo | What production uses |
+|---|---|---|
+| **HTTPS (TLS 1.2+) and HSTS** | The demo runs entirely on your machine, so traffic never leaves it. | TLS at the load balancer. The HSTS header code exists but turns on only when `ENV=production`. |
+| **Encrypted database connection** | The API and database share a private Docker network. | Managed Postgres with `sslmode=verify-full`, which encrypts the connection *and* checks it's talking to the real database server. |
+| **Managed key service** (KMS) | Needs a cloud account. | A KMS-backed `FieldCipher` (AWS KMS, GCP KMS, or Vault), ideally with the practice holding its own key. |
+| **Disk and backup encryption** | This is an infrastructure setting. | Turned on in the managed database. |
+| **BAA-covered AI provider** | The demo uses only synthetic data. | See [Production readiness](#production-readiness). |
+| **Login, sessions, and CSRF** | The MVP uses a demo persona picker instead of login. | Password login (argon2) and short-lived server sessions (opaque tokens in an httpOnly cookie, double-submit CSRF), behind `current_user`. |
+| **Badge/SSO login and MFA** | Needs an identity provider. | A new identity provider behind `current_user`. |
+| **Encryption v2** | v1 is enough for the demo, and v2 needs a KMS to be worthwhile. | Per-patient keys (envelope encryption), each encrypted value tied to its row, and crypto-shredding. It's a new `FieldCipher` implementation using the `v2:` tag, rolled out by re-encrypting records. |
+| **Key rotation** | This is an operational process. | MultiFernet already supports it. Add a re-encryption script when it's needed. |
 
 ## Production readiness
 

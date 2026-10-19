@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -9,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.ai.gateway import gateway_from_settings
+from app.ai.nlp import warm_up
 from app.api import health, v1
 from app.auth.identity import PERSONA_HEADER
 from app.config import Settings, get_settings, validate_settings
@@ -49,6 +51,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.sessionmaker = async_sessionmaker(app.state.engine, expire_on_commit=False)
         if settings.demo_mode:
             await _demo_schedule_on_startup(app, settings)
+        if settings.env != "test":
+            # Loading the leak check's language model takes seconds; do it beside startup, not
+            # inside the first summary. Tests skip it: they build many apps.
+            app.state.nlp_warm_up = asyncio.create_task(asyncio.to_thread(warm_up))
         yield
         await app.state.engine.dispose()
 

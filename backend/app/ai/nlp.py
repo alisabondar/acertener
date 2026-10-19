@@ -44,6 +44,11 @@ def _analyzer() -> AnalyzerEngine:
     return AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
 
 
+def warm_up() -> None:
+    """Load the language model now, so the first summary after a restart doesn't wait for it."""
+    _analyzer()
+
+
 def find_entities(text: str, kinds: tuple[str, ...]) -> list[tuple[int, int, str]]:
     """(start, end, kind) spans of people or places, skipping redaction tokens and eponyms."""
     spans = []

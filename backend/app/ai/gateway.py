@@ -34,17 +34,22 @@ SYSTEM_PROMPT = (
     "written there. Never guess or invent names, dates, or other identifying details.\n"
     "Write it the way an experienced clinician would:\n"
     "- Start with a one-line summary: age, sex, and the key active conditions "
-    "(e.g. '63M with T2DM and HTN.').\n"
+    "(e.g. '63M with T2DM and HTN.'). The summary is read before the visit, so don't say the "
+    "patient is 'presenting'.\n"
+    "- Then one line on the most recent visit: when, and what it was for "
+    "(e.g. 'Last seen 2 weeks ago for a persistent cough.').\n"
     "- Then the active problems in order of clinical importance, each with its latest value "
     "and trend where the chart has one.\n"
     "- Put abnormal or worsening findings first and say briefly why they matter (for example, "
     "a blood pressure that is high for the patient's age).\n"
+    "- Mention an allergy only when it bears on an active problem or its usual treatment "
+    "(e.g. a severe ACE-inhibitor allergy in a patient with HTN).\n"
     "- End with anything still open, such as a follow-up or a recheck that is due.\n"
-    "- Do not recount the history visit by visit, and leave out routine counseling and "
-    "'follow up as needed'.\n"
+    "- Apart from that one line, do not recount the history visit by visit, and leave out "
+    "routine counseling and 'follow up as needed'.\n"
     "- Each day_offset counts days from today (negative is the past); write them as relative "
     "time a clinician would say, like 'about 9 months ago' or '2 weeks ago', never as numbers.\n"
-    "- Standard clinical abbreviations are fine. Keep it under 80 words.\n"
+    "- Standard clinical abbreviations are fine. Keep it under 90 words.\n"
     'Reply only with JSON of the form {"narrative": "<the summary>"}.'
 )
 
@@ -117,6 +122,12 @@ class MockProvider:
             v = context.vitals[-1]
             if v.bp_systolic and v.bp_diastolic:
                 parts.append(f"Most recent BP {v.bp_systolic}/{v.bp_diastolic}.")
+        if context.allergies:
+            listed = ", ".join(
+                f"{a.substance} ({a.severity})" if a.severity else a.substance
+                for a in context.allergies
+            )
+            parts.append(f"Allergies: {listed}.")
         count = len(context.notes)
         parts.append(
             f"{count} finalized note{'s' if count != 1 else ''} reviewed."
@@ -242,14 +253,15 @@ class Gateway:
     ) -> Result:
         if not isinstance(context, DeidentifiedClinicalContext):
             raise TypeError("The gateway only sends a DeidentifiedClinicalContext")
-        before = leak_check(context.model_dump_json(), ids)
+        terms = context.clinical_terms()
+        before = leak_check(context.model_dump_json(), ids, terms)
         if not before.ok:
             return Blocked(before.detectors, "input")
         if wait := self._limiter.take():
             return RateLimited(wait)
         result = await self.provider.complete(context)
         if isinstance(result, Summary):
-            after = leak_check(result.narrative, ids)
+            after = leak_check(result.narrative, ids, terms)
             if not after.ok:
                 return Blocked(after.detectors, "output")
         return result
@@ -258,7 +270,16 @@ class Gateway:
 def gateway_from_settings(
     provider: str, api_key: str | None, model: str, per_minute: int
 ) -> Gateway:
-    """'auto' uses Gemini when a key is configured, otherwise the deterministic mock."""
+    """'auto' uses Gemini when a key is configured, otherwise the deterministic mock.
+
+    'baa' is the production slot: a HIPAA-eligible provider under a signed Business Associate
+    Agreement. It isn't wired to a vendor yet, so it refuses to start rather than fall back.
+    """
+    if provider == "baa":
+        raise RuntimeError(
+            "SUMMARY_PROVIDER=baa needs a BAA-covered provider (e.g. Vertex AI, Azure OpenAI, or"
+            " Bedrock) implemented in app/ai/gateway.py before real patient data is used"
+        )
     use_gemini = provider == "gemini" or (provider == "auto" and api_key)
     chosen: Provider = GeminiProvider(api_key or "", model) if use_gemini else MockProvider()
     return Gateway(chosen, TokenBucket(per_minute=per_minute))

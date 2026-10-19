@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto import FieldCipher
-from app.db.models import AuditLog, Patient, User
+from app.db.models import AuditLog, Condition, Patient, User
 from app.patients.repository import PatientRepository
 from tests.factories import (
     add_to_care_team,
@@ -242,3 +242,35 @@ async def test_search_by_mrn_alone_ignores_case_and_spacing(
     )
 
     assert [i["id"] for i in response.json()["items"]] == [str(target.id)]
+
+
+async def test_clinical_roles_see_active_problems_and_front_desk_does_not(
+    api: httpx2.AsyncClient, db_session: AsyncSession, field_cipher: FieldCipher, me: User
+) -> None:
+    patient = await _patient(db_session, field_cipher)
+    db_session.add_all(
+        [
+            Condition(
+                patient_id=patient.id, icd10_code="I10", name="Hypertension", recorded_by=me.id
+            ),
+            Condition(
+                patient_id=patient.id, icd10_code="E11.9", name="Type 2 diabetes", recorded_by=me.id
+            ),
+            Condition(
+                patient_id=patient.id,
+                icd10_code="J45.909",
+                name="Asthma",
+                status="resolved",
+                recorded_by=me.id,
+            ),
+        ]
+    )
+    await db_session.flush()
+    front_desk = await add_user(db_session, "front_desk")
+
+    clinical = await _list(api, persona_headers(me), scope="all")
+    desk = await _list(api, persona_headers(front_desk), scope="all")
+
+    [row] = [p for p in clinical["items"] if p["id"] == str(patient.id)]
+    assert sorted(row["active_problems"]) == ["Hypertension", "Type 2 diabetes"]
+    assert all(p["active_problems"] is None for p in desk["items"])

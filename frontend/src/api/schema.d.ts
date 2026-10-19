@@ -919,6 +919,8 @@ export interface components {
     };
     /** PatientListItem */
     PatientListItem: {
+      /** Active Problems */
+      active_problems: string[] | null;
       /** Age */
       age: number;
       /** Archived */
@@ -1087,10 +1089,16 @@ export interface components {
      * @description Straight from the chart, never from the AI, so it's always available and exact.
      */
     SummaryHeader: {
+      /** Age */
+      age: number;
       /** Allergies */
       allergies: components["schemas"]["SummaryAllergy"][];
       /** Conditions */
       conditions: components["schemas"]["SummaryCondition"][];
+      /** First Name */
+      first_name: string;
+      /** Last Name */
+      last_name: string;
     };
     /** SummaryOut */
     SummaryOut: {

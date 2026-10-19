@@ -57,6 +57,37 @@ describe("patient list", () => {
     expect(becker).toHaveTextContent("No visit in 3+ years");
   });
 
+  it("shows clinicians each patient's active problems", async () => {
+    listReturns(() =>
+      HttpResponse.json(
+        makePage([
+          makePatient({
+            last_name: "Osei",
+            active_problems: ["Hypertension", "Type 2 diabetes", "Asthma"],
+          }),
+          makePatient({ last_name: "Becker", active_problems: [] }),
+        ]),
+      ),
+    );
+    renderApp("/patients");
+
+    const [osei, becker] = await rows();
+    expect(screen.getByRole("columnheader", { name: "Active problems" })).toBeInTheDocument();
+    expect(osei).toHaveTextContent("Hypertension, Type 2 diabetes +1 more");
+    expect(becker).toHaveTextContent("None");
+  });
+
+  it("hides the active-problems column from front desk", async () => {
+    listReturns(() =>
+      HttpResponse.json(makePage([makePatient({ last_name: "Osei", active_problems: null })])),
+    );
+    renderApp("/patients", { persona: BROOKS });
+
+    await rows();
+    expect(screen.queryByRole("columnheader", { name: "Active problems" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Status" })).not.toBeInTheDocument();
+  });
+
   it("opens a patient's chart from their row", async () => {
     const user = userEvent.setup();
     const patient = makePatient({ last_name: "Osei" });

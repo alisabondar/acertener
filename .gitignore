@@ -38,4 +38,5 @@ backend/loadtest/results/
 docs/spec.md
 docs/build-plan.md
 docs/audit-loop.md
+docs/AUDIT.md
 docs/loadtest/

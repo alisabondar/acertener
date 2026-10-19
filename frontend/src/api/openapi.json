@@ -816,6 +816,7 @@
             "anyOf": [
               {
                 "maxLength": 200,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -828,6 +829,7 @@
             "anyOf": [
               {
                 "maxLength": 200,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -839,7 +841,8 @@
           "city": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 100,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -863,7 +866,8 @@
           "email": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 254,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -919,7 +923,7 @@
           "mrn": {
             "anyOf": [
               {
-                "maxLength": 100,
+                "maxLength": 40,
                 "minLength": 1,
                 "type": "string"
               },
@@ -932,7 +936,8 @@
           "phone": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 30,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -944,7 +949,8 @@
           "postal_code": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 10,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -956,7 +962,8 @@
           "state": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 2,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -976,6 +983,7 @@
             "anyOf": [
               {
                 "maxLength": 200,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -988,6 +996,7 @@
             "anyOf": [
               {
                 "maxLength": 200,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -999,7 +1008,8 @@
           "city": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 100,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1021,7 +1031,8 @@
           "email": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 254,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1061,7 +1072,7 @@
             "type": "string"
           },
           "mrn": {
-            "maxLength": 100,
+            "maxLength": 40,
             "minLength": 1,
             "title": "Mrn",
             "type": "string"
@@ -1069,7 +1080,8 @@
           "phone": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 30,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1081,7 +1093,8 @@
           "postal_code": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 10,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1093,7 +1106,8 @@
           "state": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "maxLength": 2,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1300,6 +1314,20 @@
       },
       "PatientListItem": {
         "properties": {
+          "active_problems": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Problems"
+          },
           "age": {
             "title": "Age",
             "type": "integer"
@@ -1365,7 +1393,8 @@
           "last_visit_at",
           "archived",
           "on_my_care_team",
-          "inactivity_suggested"
+          "inactivity_suggested",
+          "active_problems"
         ],
         "title": "PatientListItem",
         "type": "object"
@@ -1696,6 +1725,10 @@
       "SummaryHeader": {
         "description": "Straight from the chart, never from the AI, so it's always available and exact.",
         "properties": {
+          "age": {
+            "title": "Age",
+            "type": "integer"
+          },
           "allergies": {
             "items": {
               "$ref": "#/components/schemas/SummaryAllergy"
@@ -1709,9 +1742,20 @@
             },
             "title": "Conditions",
             "type": "array"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
           }
         },
         "required": [
+          "first_name",
+          "last_name",
+          "age",
           "allergies",
           "conditions"
         ],

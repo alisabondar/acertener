@@ -1,19 +1,36 @@
+import asyncio
+import json
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx2
 import pytest
 from fastapi import FastAPI
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.ai.gateway import Failed, Gateway, MockProvider, RateLimited, Result, TokenBucket
+from app.ai import summary as summary_module
+from app.ai.gateway import (
+    ALLOWED_HOSTS,
+    Failed,
+    Gateway,
+    GeminiProvider,
+    MockProvider,
+    RateLimited,
+    Result,
+    TokenBucket,
+)
 from app.ai.payload import DeidentifiedClinicalContext
-from app.ai.summary import generate
+from app.ai.summary import SummaryService, generate
 from app.audit import Audit
+from app.config import Settings
 from app.crypto import FieldCipher
+from app.db import create_engine
 from app.db.models import AuditLog, Condition, Note, Patient, PatientSummary, User
+from app.patients.derived import age_on
+from app.patients.queries import practice_today
 from tests.factories import add_user, create_patient, make_audit, persona_headers
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
@@ -81,12 +98,15 @@ async def _set_summary(session: AsyncSession, patient: Patient, **values: Any) -
 
 
 async def test_a_first_view_generates_a_summary_with_a_deterministic_header(
-    api: Api, doctor: User, patient: Patient, provider: CountingProvider
+    api: Api, doctor: User, patient: Patient, provider: CountingProvider, settings: Settings
 ) -> None:
     first = await _summary(api, doctor, patient)
     second = await _summary(api, doctor, patient)
 
     assert first["status"] == "generating"
+    today = practice_today(datetime.now(UTC), ZoneInfo(settings.practice_timezone))
+    assert (first["header"]["first_name"], first["header"]["last_name"]) == ("Rose", "Oneil")
+    assert first["header"]["age"] == age_on(date(1990, 1, 31), today)
     assert first["header"]["conditions"] == [{"icd10_code": "I10", "name": "Hypertension"}]
     assert second["status"] == "fresh"
     assert "Hypertension" in second["narrative"]
@@ -95,31 +115,79 @@ async def test_a_first_view_generates_a_summary_with_a_deterministic_header(
     assert provider.calls == 1
 
 
-async def test_a_recent_change_waits_for_the_debounce(
-    api: Api, db_session: AsyncSession, doctor: User, patient: Patient, provider: CountingProvider
+class Clock:
+    def __init__(self) -> None:
+        self.now = datetime(2026, 10, 19, 15, 0, tzinfo=UTC)
+
+    def advance(self, seconds: int) -> None:
+        self.now += timedelta(seconds=seconds)
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
+    """Frozen time for the summary service; tests move it forward explicitly."""
+    frozen = Clock()
+    monkeypatch.setattr(summary_module, "_now", lambda: frozen.now)
+    return frozen
+
+
+async def test_a_change_waits_out_the_debounce_then_regenerates(
+    api: Api,
+    db_session: AsyncSession,
+    doctor: User,
+    patient: Patient,
+    provider: CountingProvider,
+    clock: Clock,
 ) -> None:
-    await _set_summary(
-        db_session, patient, source_changed_at=datetime.now(UTC) - timedelta(seconds=5)
-    )
+    changed_at = clock.now
+    await _set_summary(db_session, patient, source_changed_at=changed_at)
+    clock.advance(5)
 
-    body = await _summary(api, doctor, patient)
+    waiting = await _summary(api, doctor, patient)
+    clock.advance(10)
+    settled = await _summary(api, doctor, patient)
+    after = await _summary(api, doctor, patient)
 
-    assert body["status"] == "stale"
-    assert body["next_refresh_at"] is not None
-    assert provider.calls == 0
-
-
-async def test_a_settled_change_regenerates_once_even_with_many_viewers(
-    api: Api, db_session: AsyncSession, doctor: User, patient: Patient, provider: CountingProvider
-) -> None:
-    await _set_summary(
-        db_session, patient, source_changed_at=datetime.now(UTC) - timedelta(seconds=30)
-    )
-
-    views = [await _summary(api, doctor, patient) for _ in range(3)]
-
-    assert views[-1]["status"] == "fresh"
+    assert waiting["status"] == "stale"
+    assert datetime.fromisoformat(waiting["next_refresh_at"]) == changed_at + timedelta(seconds=15)
+    assert settled["status"] == "generating"
+    assert after["status"] == "fresh"
     assert provider.calls == 1
+
+
+async def test_concurrent_viewers_start_only_one_generation(
+    migrated_database: str, field_cipher: FieldCipher
+) -> None:
+    """Separate connections, viewing at the same moment: the atomic claim lets one through."""
+    engine = create_engine(migrated_database)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as setup:
+        patient = await create_patient(setup, field_cipher)
+        setup.add(
+            PatientSummary(
+                patient_id=patient.id,
+                status="stale",
+                source_changed_at=datetime.now(UTC) - timedelta(minutes=1),
+            )
+        )
+        await setup.commit()
+
+    async def view() -> bool:
+        async with sessions() as session:
+            state = await SummaryService(session, timedelta(seconds=15)).view(patient.id)
+            return state.claimed
+
+    try:
+        claims = await asyncio.gather(*(view() for _ in range(5)))
+        assert claims.count(True) == 1
+    finally:
+        async with sessions() as cleanup:
+            await cleanup.execute(
+                delete(PatientSummary).where(PatientSummary.patient_id == patient.id)
+            )
+            await cleanup.execute(delete(Patient).where(Patient.id == patient.id))
+            await cleanup.commit()
+        await engine.dispose()
 
 
 async def test_an_unchanged_chart_reuses_the_cached_narrative(
@@ -398,3 +466,63 @@ async def test_an_unexpected_error_ends_as_failed_rather_than_stuck_generating(
     body = await _summary(api, doctor, patient)
 
     assert (body["status"], body["error_code"]) == ("failed", "internal_error")
+
+
+@pytest.mark.privacy
+async def test_canary_through_the_full_stack_never_leaves_in_an_outbound_byte(
+    api: Api, db_session: AsyncSession, field_cipher: FieldCipher, app: FastAPI
+) -> None:
+    """API → database → de-identifier → leak check → gateway → a recording transport."""
+    doctor = await add_user(db_session, "provider", name="Dr. Quill Ashgrove")
+    patient = await create_patient(
+        db_session,
+        field_cipher,
+        first_name="Zephyrine",
+        last_name="Quorrowby",
+        mrn="MRN-771905",
+        phone="555-301-7719",
+        email="z.quorrowby@example.test",
+        city="Wexhollow",
+    )
+    db_session.add(
+        Note(
+            patient_id=patient.id,
+            author_id=doctor.id,
+            encounter_at=datetime.now(UTC) - timedelta(days=2),
+            content="Zephyrine Quorrowby (MRN-771905) called from 555-301-7719 about her cough.",
+            status="final",
+            finalized_at=datetime.now(UTC),
+        )
+    )
+    await db_session.flush()
+    sent: list[httpx2.Request] = []
+
+    def record(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.host in ALLOWED_HOSTS, request.url.host
+        sent.append(request)
+        reply = json.dumps({"narrative": "Adult with a cough for a few days."})
+        return httpx2.Response(
+            200, json={"candidates": [{"content": {"parts": [{"text": reply}]}}]}
+        )
+
+    gemini = GeminiProvider(api_key="k", model="m", transport=httpx2.MockTransport(record))
+    app.state.gateway = Gateway(gemini, TokenBucket(per_minute=1000))
+
+    await _summary(api, doctor, patient)
+    body = await _summary(api, doctor, patient)
+
+    assert body["status"] == "fresh"
+    [request] = sent
+    outbound = (str(request.url) + str(request.headers) + request.content.decode()).lower()
+    for canary in (
+        "zephyrine",
+        "quorrowby",
+        "771905",
+        "3017719",
+        "301-7719",
+        "example.test",
+        "wexhollow",
+        "ashgrove",
+        str(patient.id),
+    ):
+        assert canary not in outbound, canary

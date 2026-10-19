@@ -64,8 +64,9 @@ export default defineConfig({
       include: ["src/**/*.{ts,tsx}"],
       // Generated code, vendored shadcn primitives and test helpers aren't ours to cover.
       exclude: ["src/api/schema.d.ts", "src/components/ui/**", "src/test/**", "src/**/*.test.*"],
-      // A little under today's numbers, so CI catches a drop without failing on noise.
-      thresholds: { statements: 88, branches: 78, functions: 84, lines: 88 },
+      // At least the spec's 80% everywhere; statements, functions, and lines sit a little under
+      // today's numbers, so CI catches a drop without failing on noise.
+      thresholds: { statements: 88, branches: 80, functions: 84, lines: 88 },
     },
   },
 });

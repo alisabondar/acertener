@@ -45,6 +45,11 @@ class Diagnosis(_Frozen):
     status: Literal["active", "resolved"]
 
 
+class Allergy(_Frozen):
+    substance: str
+    severity: Literal["mild", "moderate", "severe"] | None
+
+
 class DeidentifiedClinicalContext(_Frozen):
     # "90+" above 89 (HIPAA Safe Harbor aggregates older ages).
     age: str
@@ -53,6 +58,11 @@ class DeidentifiedClinicalContext(_Frozen):
     notes: list[Note]
     vitals: list[Vitals]
     conditions: list[Diagnosis]
+    allergies: list[Allergy]
+
+    def clinical_terms(self) -> frozenset[str]:
+        """Allergy and condition names, which a name detector can mistake for people."""
+        return frozenset(a.substance for a in self.allergies) | {c.name for c in self.conditions}
 
     @model_validator(mode="before")
     @classmethod

@@ -9,8 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import Audit, AuditAction, AuditEntry, changed_fields, get_audit
-from app.auth.permissions import Permission, require
-from app.db.models import AuditLog, Patient, User
+from app.auth.permissions import Permission, has_permission, require
+from app.db.models import AuditLog, Condition, Patient, User
 from app.db.session import DbSession
 from app.db.types import get_field_cipher
 from app.errors import PatientNotFoundError, VersionConflictError
@@ -68,7 +68,9 @@ def list_params(
 Params = Annotated[ListParams, Depends(list_params)]
 
 
-def _item(row: ListedPatient, today: date, years: int) -> PatientListItem:
+def _item(
+    row: ListedPatient, today: date, years: int, problems: dict[uuid.UUID, list[str]] | None
+) -> PatientListItem:
     p = row.patient
     return PatientListItem(
         id=p.id,
@@ -82,7 +84,23 @@ def _item(row: ListedPatient, today: date, years: int) -> PatientListItem:
         archived=p.archived_at is not None,
         on_my_care_team=row.on_my_care_team,
         inactivity_suggested=inactivity_suggested(p, today, years),
+        active_problems=None if problems is None else problems.get(p.id, []),
     )
+
+
+async def _active_problems(
+    session: AsyncSession, patient_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[str]]:
+    """Active condition names for one page of patients, in one query."""
+    rows = await session.execute(
+        select(Condition.patient_id, Condition.name)
+        .where(Condition.patient_id.in_(patient_ids), Condition.status == "active")
+        .order_by(Condition.created_at)
+    )
+    problems: dict[uuid.UUID, list[str]] = {}
+    for patient_id, name in rows:
+        problems.setdefault(patient_id, []).append(name)
+    return problems
 
 
 async def _page(
@@ -96,8 +114,13 @@ async def _page(
     today = practice_today(datetime.now(UTC), tz)
     rows, total = await list_patients(session, get_field_cipher(), user, params, today, tz, terms)
     years = request.app.state.settings.inactive_after_years
+    problems = (
+        await _active_problems(session, [r.patient.id for r in rows])
+        if has_permission(user, Permission.VIEW_CLINICAL)
+        else None
+    )
     return PatientPage(
-        items=[_item(r, today, years) for r in rows],
+        items=[_item(r, today, years, problems) for r in rows],
         total=total,
         page=params.page,
         page_size=params.page_size,
